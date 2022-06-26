@@ -1,0 +1,10 @@
+/.DS_Store
+/.pytest_cache
+/CSV
+/__pycache__
+/data.bin
+/smt.db
+/sqlite-latest.sqlite.bz2
+/sqlite-latest.sqlite.bz2.md5
+/sqlite-latest.sqlite.bz2.md5.old
+/tranquilityDB-creator.code-workspace
