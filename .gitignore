@@ -4,7 +4,8 @@
 /__pycache__
 /data.bin
 /smt.db
-/sqlite-latest.sqlite.bz2
-/sqlite-latest.sqlite.bz2.md5
-/sqlite-latest.sqlite.bz2.md5.old
+/*.bz2
+/*.bz2.*
 /tranquilityDB-creator.code-workspace
+/*-journal
+/maps/*.svg

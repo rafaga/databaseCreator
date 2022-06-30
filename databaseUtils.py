@@ -66,7 +66,7 @@ class DatabaseUtils:
             print("SDE: removing unnecesary Data..")
             cur.execute('DELETE FROM invItems WHERE flagID > 0')
             
-            print("SDE: Removing unecessary fields fropm tables ...")
+            print("SDE: Removing unecessary fields from tables ...")
             # staStationTypes Table
             cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryX;')
             cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryY;')
@@ -103,7 +103,7 @@ class DatabaseUtils:
         # TODO: crear tabla para sistemas jove y para sistemas triglavian
         cur = self.conn.cursor()
         try:
-            print("SMT: Adding Triglavian Status Catalog Table")
+            print("SMT: Creating Triglavian Status Catalog Table")
             cur.execute('CREATE TABLE mapTriglavianStatus (trigStatusID INT NOT NULL PRIMARY KEY,'
                         'trigStatusName TEXT NOT NULL);')
 
@@ -117,18 +117,26 @@ class DatabaseUtils:
                      ' VALUES(?,?);')
             cur.executemany(query, values)
 
-            print("SMT: Adding IceBelt field to the mapSolarSystems")
-            cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN hasIceBelts BOOL NOT NULL DEFAULT 0;')
-            
-            print("SMT: Adding Jove Observatory field to the mapSolarSystems")
-            cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN hasJoveObservatory BOOL NOT NULL DEFAULT 0;')
+            print("SMT: Creating Regional Abstract Map Table")
+            cur.execute('CREATE TABLE mapAbstractSystems (solarSystemID INT '
+                        'REFERENCES mapSolarSystems(solarSystemID) ON UPDATE CASCADE ON DELETE SET NULL,'
+                        'regionID INT NOT NULL REFERENCES mapRegions(RegionID) ON UPDATE CASCADE ON DELETE SET NULL,'
+                        'x INT NOT NULL, y INT NOT NULL, CONSTRAINT pkey PRIMARY KEY (solarSystemID, regionID) '
+                        'ON CONFLICT FAIL);')
 
-            print("SMT: Adding  Triglavian Invasion Status Field to the mapSolarSystems")
-            cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN trigStatusID INT NOT NULL DEFAULT 0 '
-                        'REFERENCES mapTriglavianStatus (trigStatusID) ON UPDATE CASCADE ON DELETE CASCADE;')
+            print("SMT: Adding IceBelt, Jove Observatory and Triglavian Invasion fields to the mapSolarSystems")
+            cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN hasIceBelt BOOL NOT NULL DEFAULT 0;')
+            cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN hasJoveObservatory BOOL NOT NULL DEFAULT 0;')
+            cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN trigStatusID INT DEFAULT 0 '
+                        'REFERENCES mapTriglavianStatus (trigStatusID) ON UPDATE CASCADE ON DELETE SET NULL;')
+
+            #Partial indexes
+            print("SMT: Creating partial Indexes")
+            cur.execute('CREATE INDEX icebelts ON mapSolarSystems (hasIceBelt) WHERE hasIceBelt = 1;')
+            cur.execute('CREATE INDEX joveSystems ON mapSolarSystems (hasJoveObservatory) WHERE hasJoveObservatory > 0;')
 
             #Adding Edecom Minor victory systems
-            print("SMT: Adding Edecom Minor victory systems")
+            print("SMT: Adding Triglavian Systems with their correspondent status")
             cur.execute('UPDATE mapSolarSystems SET trigStatusID=1 WHERE solarSystemID IN (30003088,30003894'
                         ',30004302,30005074,30003570,30003463,30003788,30002724,30002999,30000102,30003919'
                         ',30004978,30004287,30002051,30003823,30005267,30003587,30003904,30005209,30005219'
@@ -142,14 +150,12 @@ class DatabaseUtils:
                         ',30001660)') 
             
             #Adding Final Liminality Systems
-            print("SMT: Adding Final Liminality systems")
             cur.execute('UPDATE mapSolarSystems SET trigStatusID=2 WHERE solarSystemID IN (30002079,30002652'
                         ',30002411,30005005,30000021,30002797,30031392,30001413,30000206,30040141,30045328'
                         ',30002770,30003504,30002737,30000192,30000157,30001372,30002702,30003046,30020141'
                         ',30045329,30002225,30001381,30001445,30010141,30005029,30003495)') 
 
             #Adding Fortress Systems
-            print("SMT: Adding Fortress systems")
             cur.execute('UPDATE mapSolarSystems SET trigStatusID=3 WHERE solarSystemID IN (30003539,30003573'
                         ',30005251,30004103,30000118,30004090,30003548,30000113,30002386,30004973,30002266'
                         ',30002530,30004141,30002253,30003398,30003490,30003556,30002385,30002704,30005058'
@@ -159,14 +165,13 @@ class DatabaseUtils:
                         ',30002251,30005260,30000105,30004992,30002243,30003553)')
 
             #Adding Triglavian Minor Victory Systems
-            print("SMT: Adding Triglavian Minor Victory systems")
             cur.execute('UPDATE mapSolarSystems SET trigStatusID=4 WHERE solarSystemID IN (30045331,30001400'
                         ',30004244,30045345,30001358,30001401,30045354,30002557,30002760,30002795,30004981'
                         ',30001447,30001390,30003076,30000163,30003073,30001391,30002771,30005330,30000205'
                         ',30003856,30002645,30045338,30002575,30001383,30003464,30000182,30001685)')
 
             #updating Jove Systems Part 1
-            print("SMT: Adding Jove Systems Part 1")
+            print("SMT: Adding Jove Systems")
             cur.execute('UPDATE mapSolarSystems SET hasJoveObservatory=1 WHERE solarSystemName IN ("0-4VQL"'
                         ',"0-ARFO","0-G8NO","0-U2M4","0-VG7A","0-WVQS","0-XIDJ","01TG-J","08S-39","0D-CHA"'
                         ',"0LTQ-C","0LY-W1","0MV-4W","0P-U0Q","12YA-2","15U-JY","16AM-3","1GT-MA","1KAW-T"'
@@ -214,7 +219,6 @@ class DatabaseUtils:
                         ',"Faswiba","FD-MLJ","FDZ4-A","FE-6YQ","Fihrneh","Fildar","Firbha","Fluekele","Fovihi")')
             
             #updating Jove Systems Part 2
-            print("SMT: Adding Jove Systems Part 2")
             cur.execute('UPDATE mapSolarSystems SET hasJoveObservatory=1 WHERE solarSystemName IN ("Frarn"'
                         ',"FRTC-5","FS-RFL","FSW-3C","FV-SE8","FV-YEA","FV1-RQ","FYD-TO","G-4H4C","G-AOTH"'
                         ',"G-G78S","G-ME2K","G-UTHL","G-YZUX","G2-INZ","G8AD-C","G9L-LP","Galeh","Gallareue"'
@@ -252,7 +256,6 @@ class DatabaseUtils:
                         ',"Nimambal","Nisuwa","NIZJ-0","NJ4X-S","Nomaa","Nomash","Nouta","NS2L-4","NSBE-L")')
 
             #updating Jove Systems Part 3
-            print("SMT: Adding Jove Systems Part 3")
             cur.execute('UPDATE mapSolarSystems SET hasJoveObservatory=1 WHERE solarSystemName IN ("NSI-MW"'
                         ',"Nuken","NZW-ZO","O-7LAI","O-CT8N","O-IVNH","O-JPKH","O-LR1H","O-MCZR","O-N589"'
                         ',"O-QKSM","O1Y-ED","O2O-2X","O3L-95","O7-7UX","Obanen","Oberen","Obrolber","Odin"'
