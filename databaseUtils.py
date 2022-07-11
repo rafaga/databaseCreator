@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 # DataProcessor - CLase encargada del registro de datos y
 # la consistencia de los mismos
@@ -23,11 +22,20 @@ class DatabaseUtils:
     def db_file(self, filename):
         self.__db_file = filename
 
+    @property
+    def extendedQueries(self):
+        return self.__extendedQueries
+    
+    @extendedQueries.setter
+    def extendedQueries(self, value):
+        self.__extendedQueries = value
+
     # Constructor
-    def __init__(self, filename):
+    def __init__(self, filename, extendedQueries = False):
         if filename is not None:
             self.db_file = filename
         self.conn = sqlite3.connect(self.db_file)
+        self.extendedQueries = extendedQueries
 
     def isSqLite3(self):
         """Function that checks if given file has a valid SQLite format"""
@@ -43,63 +51,65 @@ class DatabaseUtils:
     def syncTables(self):
         """Remove all the unnecesary tables in the database"""
         cur = self.conn.cursor()
-        print("SMT: Droping uneeded SDE tables")
-        tables = ('agtAgents','agtAgentsInSpace','agtAgentTypes','agtResearchAgents','certCerts',
-                  'certMasteries','certSkills','chrAncestries','chrAttributes','chrBloodlines','chrFactions',
-                  'chrRaces','crpActivities','crpNPCDivisions','crpNPCCorporationDivisions',
-                  'crpNPCCorporationResearchFields','crpNPCCorporations','crpNPCCorporationTrades',
-                  'dgmAttributeCategories','dgmAttributeTypes','dgmEffects','dgmExpressions','dgmTypeAttributes',
-                  'dgmTypeEffects','eveGraphics','eveIcons','eveUnits','industryActivity','industryActivityMaterials',
-                  'industryActivityProbabilities','industryActivityProducts','industryActivityRaces',
-                  'industryActivitySkills','industryBlueprints','invContrabandTypes','invControlTowerResourcePurposes',
-                  'invControlTowerResources','invFlags','invMarketGroups','invMetaGroups','invMetaTypes',
-                  'invTraits','invTypeMaterials','invTypeReactions','mapLandmarks','mapLocationScenes','mapDenormalize',
-                  'mapCelestialGraphics','planetSchematics','planetSchematicsPinMap','planetSchematicsTypeMap',
-                  'ramActivities','ramAssemblyLineStations','ramAssemblyLineTypeDetailPerCategory',
-                  'ramAssemblyLineTypeDetailPerGroup','ramAssemblyLineTypes','ramInstallationTypeContents',
-                  'skinLicense','skinMaterials','skins','skinShip','translationTables','trnTranslationColumns',
-                  'trnTranslationLanguages','trnTranslations','warCombatZones','warCombatZoneSystems')
         try:
-            for table in tables:
-                cur.execute('DROP TABLE IF EXISTS ' + table)
+            if self.extendedQueries:
+                print("SMT: Droping uneeded SDE tables")
+                tables = ('agtAgents','agtAgentsInSpace','agtAgentTypes','agtResearchAgents','certCerts',
+                        'certMasteries','certSkills','chrAncestries','chrAttributes','chrBloodlines','chrFactions',
+                        'chrRaces','crpActivities','crpNPCDivisions','crpNPCCorporationDivisions',
+                        'crpNPCCorporationResearchFields','crpNPCCorporations','crpNPCCorporationTrades',
+                        'dgmAttributeCategories','dgmAttributeTypes','dgmEffects','dgmExpressions','dgmTypeAttributes',
+                        'dgmTypeEffects','eveGraphics','eveIcons','eveUnits','industryActivity','industryActivityMaterials',
+                        'industryActivityProbabilities','industryActivityProducts','industryActivityRaces',
+                        'industryActivitySkills','industryBlueprints','invContrabandTypes','invControlTowerResourcePurposes',
+                        'invControlTowerResources','invFlags','invMarketGroups','invMetaGroups','invMetaTypes',
+                        'invTraits','invTypeMaterials','invTypeReactions','mapLandmarks','mapLocationScenes','mapDenormalize',
+                        'mapCelestialGraphics','planetSchematics','planetSchematicsPinMap','planetSchematicsTypeMap',
+                        'ramActivities','ramAssemblyLineStations','ramAssemblyLineTypeDetailPerCategory',
+                        'ramAssemblyLineTypeDetailPerGroup','ramAssemblyLineTypes','ramInstallationTypeContents',
+                        'skinLicense','skinMaterials','skins','skinShip','translationTables','trnTranslationColumns',
+                        'trnTranslationLanguages','trnTranslations','warCombatZones','warCombatZoneSystems')
+                
+                for table in tables:
+                    cur.execute('DROP TABLE IF EXISTS ' + table)
 
-            print("SDE: removing unnecesary Data..")
-            cur.execute('DELETE FROM invItems WHERE flagID > 0')
-            
-            print("SDE: Removing unecessary fields from tables ...")
-            # staStationTypes Table
-            cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryX;')
-            cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryY;')
-            cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryZ;')
-            cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockOrientationX;')
-            cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockOrientationY;')
-            cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockOrientationZ;')
+                print("SDE: removing unnecesary Data..")
+                cur.execute('DELETE FROM invItems WHERE flagID > 0')
+                
+                print("SDE: Removing unecessary fields from tables ...")
+                # staStationTypes Table
+                cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryX;')
+                cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryY;')
+                cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockEntryZ;')
+                cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockOrientationX;')
+                cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockOrientationY;')
+                cur.execute('ALTER TABLE staStationTypes DROP COLUMN dockOrientationZ;')
 
-            #staStations Table
-            cur.execute('ALTER TABLE staStations DROP COLUMN dockingCostPerVolume;')
-            cur.execute('ALTER TABLE staStations DROP COLUMN officeRentalCost;')
-            cur.execute('ALTER TABLE staStations DROP COLUMN reprocessingEfficiency;')
-            cur.execute('ALTER TABLE staStations DROP COLUMN reprocessingStationsTake;')
-            cur.execute('ALTER TABLE staStations DROP COLUMN reprocessingHangarFlag;')
+                #staStations Table
+                cur.execute('ALTER TABLE staStations DROP COLUMN dockingCostPerVolume;')
+                cur.execute('ALTER TABLE staStations DROP COLUMN officeRentalCost;')
+                cur.execute('ALTER TABLE staStations DROP COLUMN reprocessingEfficiency;')
+                cur.execute('ALTER TABLE staStations DROP COLUMN reprocessingStationsTake;')
+                cur.execute('ALTER TABLE staStations DROP COLUMN reprocessingHangarFlag;')
 
-            #staOperations Table
-            cur.execute('ALTER TABLE staOperations DROP COLUMN caldariStationTypeID;')
-            cur.execute('ALTER TABLE staOperations DROP COLUMN amarrStationTypeID;')
-            cur.execute('ALTER TABLE staOperations DROP COLUMN minmatarStationTypeID;')
-            cur.execute('ALTER TABLE staOperations DROP COLUMN gallenteStationTypeID;')
-            cur.execute('ALTER TABLE staOperations DROP COLUMN joveStationTypeID;')
+                #staOperations Table
+                cur.execute('ALTER TABLE staOperations DROP COLUMN caldariStationTypeID;')
+                cur.execute('ALTER TABLE staOperations DROP COLUMN amarrStationTypeID;')
+                cur.execute('ALTER TABLE staOperations DROP COLUMN minmatarStationTypeID;')
+                cur.execute('ALTER TABLE staOperations DROP COLUMN gallenteStationTypeID;')
+                cur.execute('ALTER TABLE staOperations DROP COLUMN joveStationTypeID;')
 
-            #invTypes table
-            cur.execute('ALTER TABLE invTypes DROP COLUMN iconID;')
-            cur.execute('ALTER TABLE invTypes DROP COLUMN soundID;')
-            cur.execute('ALTER TABLE invTypes DROP COLUMN graphicID;')
+                #invTypes table
+                cur.execute('ALTER TABLE invTypes DROP COLUMN iconID;')
+                cur.execute('ALTER TABLE invTypes DROP COLUMN soundID;')
+                cur.execute('ALTER TABLE invTypes DROP COLUMN graphicID;')
             self.conn.commit()
         except:
             self.conn.rollback()
         cur.close()
         del cur
 
-    def addAddtionalData(self):
+    def addAdditionalData(self):
         # TODO: crear tabla para sistemas jove y para sistemas triglavian
         cur = self.conn.cursor()
         try:

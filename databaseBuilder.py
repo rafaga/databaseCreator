@@ -7,13 +7,19 @@ import bz2
 from databaseUtils import DatabaseUtils
 from pathlib import Path
 import xml.etree.ElementTree
+import zipfile
+from sdeParser import yamlParser
 
-dbUrl = 'https://www.fuzzwork.co.uk/dump/'
+fuzzDbUrl = 'https://www.fuzzwork.co.uk/dump/'
+sdeUrl = 'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/'
 mapsURL = 'http://evemaps.dotlan.net/svg/'
-zName = 'sqlite-latest.sqlite.bz2'
-uzName = 'smt.db'
+fuzzDbName = 'sqlite-latest.sqlite.bz2'
+sdeFileName = 'sde.zip'
+sdeChecksum = 'checksum' 
+outFileName = 'smt.db'
 chunksize = 2391975
 updateDetected = False
+fromFuzzWorks = False
 
 def iterateList(array):
     for value in array:
@@ -39,7 +45,7 @@ def extractMapData(mapFileName, dbConnection):
         cur.close()
     
     solarSystemIds.clear()
-    """ here we are iterating over Ice Belts and adding to Database """
+    """ here we retrieving all the coordionates from the Regional maps """
     tags = root.findall(".//{http://www.w3.org/2000/svg}use")
     regionId = int(Path(mapFileName).name.split('.')[0])
     cur = dbConnection.cursor()
@@ -112,49 +118,74 @@ def bz2Decompress(compressedFilePath,uncompressedFilePath):
     print('SDE: Decompressing Done       ')
     return nbytes
 
+def zipDecompress(compressedFilePath,outputPath):
+    with zipfile.ZipFile(compressedFilePath, 'r') as zip_ref:
+        zip_ref.extractall(outputPath)
+
+source = []
+if fromFuzzWorks:
+    source.append(os.path.join('.',fuzzDbName + '.md5'))
+    source.append(os.path.join('.',fuzzDbName + '.md5.old'))
+    source.append(fuzzDbUrl + fuzzDbName + '.md5')
+    source.append(fuzzDbUrl + fuzzDbName)
+    source.append(os.path.join('.',fuzzDbName))
+else:
+    source.append(os.path.join('.','sde.md5'))
+    source.append(os.path.join('.','sde.md5.old'))
+    source.append(sdeUrl + sdeChecksum)
+    source.append(sdeUrl + sdeFileName)
+    source.append(os.path.join('.',sdeFileName))
+source.append(os.path.join('.',outFileName))
+
 """ Download the MD5 Checksum """ 
-downloadFile(dbUrl + zName + '.md5')
+downloadFile(source[2])
 
 """ this chunk of code detects if a new File exists """
-filenames = [os.path.join('.',zName + '.md5'),os.path.join('.',zName + '.md5.old')]
-if Path(filenames[1]).exists():
+if Path(source[1]).exists():
     md5File = []
-    md5File.append(open(filenames[0],'rt'))
-    md5File.append(open(filenames[1],'rt'))
+    md5File.append(open(source[0],'rt'))
+    md5File.append(open(source[1],'rt'))
     if md5File[0].read() != md5File[1].read():
         updateDetected = True
     md5File[0].close()
     md5File[1].close()
     """ Avoiding an Error on Windows OS, because the file its in use """ 
     if updateDetected:
-        os.remove(filenames[1]) 
+        os.remove(source[1]) 
 else:
     updateDetected = True
 
 """ we take an action based on what was detected """ 
 if updateDetected:
     print("SDE: a new version has been detected, proceding to download")
-    os.rename(filenames[0],filenames[1])
-    try:
-        os.remove(os.path.join('.', zName))
-    except:
-        print("SDE Error: previous file does not exists.")
-    mbytesDownloaded = downloadFile(dbUrl + zName)/(1024*1024)
+    os.rename(source[0],source[1])
+    if Path(source[4]).exists():
+        print("A previous version has been detected... deleting")
+        os.remove(source[4])
+    # if Fuzzworks is not being used, then we delete the uncompessed directory
+    if not fromFuzzWorks:
+        os.removedirs(os.path.join('.','sde'))
+    mbytesDownloaded = downloadFile(source[3])/(1024*1024)
     print("SDE: Downloaded %0.2f Mb          "%mbytesDownloaded)
 else:
     print("SDE: The database it is already updated")
 
 """ remove the database if already exists, because we don't know the state of such file """ 
-if Path(os.path.join('.', uzName)).exists():
-    os.remove(os.path.join('.', uzName))
+if Path(source[5]).exists():
+    os.remove(source[5])
 
-""" decompressing the database """ 
-bz2Decompress(os.path.join('.', zName),os.path.join('.', uzName))
+# decompressing the database 
+if fromFuzzWorks:
+    bz2Decompress(source[4],source[5])
+    """ We have the SDE database in all its full glory, let's to slim dat thicc file now """
+    processor = DatabaseUtils(source[5])
+else:
+    zipDecompress(source[4],os.path.join('.','sde'))
+    processor = yamlParser(os.path.join('.','sde'),source[5])
 
-""" We have the SDE database in all its full glory, let's to slim dat thicc file now """
-SDEprocessor = DatabaseUtils(os.path.join('.', uzName))
-SDEprocessor.syncTables()
-SDEprocessor.addAddtionalData()
+
+processor.syncTables()
+processor.addAdditionalData()
 
 """ Retrieving all Regions from Dotlan to parse the SVG data """
 eveRegions = getAllRegions(SDEprocessor.conn)
@@ -170,8 +201,7 @@ for region in eveRegions:
         else:
             print("Dotlan: Downloaded Map for " + region[1])
     print("Dotlan: parsing data for " + region[1])
-    extractMapData(mapFilePath, SDEprocessor.conn)
+    extractMapData(mapFilePath, sdeParser.conn)
     
 
-SDEprocessor.vacumm()
 
