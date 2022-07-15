@@ -4,11 +4,13 @@
 import requests
 import os
 import bz2
+
+from sqlalchemy import false
 from databaseUtils import DatabaseUtils
 from pathlib import Path
 import xml.etree.ElementTree
 import zipfile
-from sdeParser import yamlParser
+from sdeParser import sdeParser,sdeConfig
 
 fuzzDbUrl = 'https://www.fuzzwork.co.uk/dump/'
 sdeUrl = 'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/'
@@ -179,29 +181,35 @@ if fromFuzzWorks:
     bz2Decompress(source[4],source[5])
     """ We have the SDE database in all its full glory, let's to slim dat thicc file now """
     processor = DatabaseUtils(source[5])
+    processor.syncTables()
+    processor.addAdditionalData()
 else:
     zipDecompress(source[4],os.path.join('.','sde'))
-    processor = yamlParser(os.path.join('.','sde'),source[5])
+    processor = sdeParser(os.path.join('.','sde'),source[5])
+    processor.configuration.extendedCoordinates = False
+    processor.configuration.mapAbbysal = False
+    processor.configuration.mapKSpace= True
+    processor.configuration.mapVoid = False
+    processor.configuration.mapWSpace = False
+    processor.createTableStructure()
+    processor.parseData()
 
-
-processor.syncTables()
-processor.addAdditionalData()
-
-""" Retrieving all Regions from Dotlan to parse the SVG data """
-eveRegions = getAllRegions(SDEprocessor.conn)
-for region in eveRegions:
-    fileSize = 0
-    mapFilePath = os.path.join('./maps/', str(region[0]) + '.svg')
-    if not Path(mapFilePath).exists():
-        mapUrl = mapsURL + region[1].replace(' ','_') + ".svg"
-        fileSize = downloadFile(mapUrl,"maps/" + str(region[0]) + ".svg")
-        if fileSize <= 100:
-            os.remove("maps/" + str(region[0]) + ".svg")
-            print("Dotlan: Invalid data was recieved for " + region[1])
-        else:
-            print("Dotlan: Downloaded Map for " + region[1])
-    print("Dotlan: parsing data for " + region[1])
-    extractMapData(mapFilePath, sdeParser.conn)
+if processor is not None:
+    """ Retrieving all Regions from Dotlan to parse the SVG data """
+    eveRegions = getAllRegions(processor.conn)
+    for region in eveRegions:
+        fileSize = 0
+        mapFilePath = os.path.join('./maps/', str(region[0]) + '.svg')
+        if not Path(mapFilePath).exists():
+            mapUrl = mapsURL + region[1].replace(' ','_') + ".svg"
+            fileSize = downloadFile(mapUrl,"maps/" + str(region[0]) + ".svg")
+            if fileSize <= 100:
+                os.remove("maps/" + str(region[0]) + ".svg")
+                print("Dotlan: Invalid data was recieved for " + region[1])
+            else:
+                print("Dotlan: Downloaded Map for " + region[1])
+        print("Dotlan: parsing data for " + region[1])
+        extractMapData(mapFilePath, sdeParser.conn)
     
 
 
