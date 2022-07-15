@@ -28,7 +28,7 @@ class DatabaseDriver:
         # a validation should be done here
         if self.databaseType == DatabaseType.SQLITE:
             dbfile = Path(dataSourceString)
-            if dbfile.exists and dbfile.is_file:
+            if dbfile.exists and dbfile.is_file():
                 if self.__isSqLite3(dbfile):
                     self.__createConnection(dataSourceString)
             else:

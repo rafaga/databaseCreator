@@ -69,7 +69,7 @@ class sdeParser:
 
             #GroupIds - SQLite
             query = ('CREATE TABLE IF NOT EXISTS invGroups( groupId INT NOT NULL PRIMARY KEY'
-                     ',categoryName TEXT NOT NULL ,categoryId INT NOT NULL REFERENCES invCategories(categoryId) '
+                     ',groupName TEXT NOT NULL ,categoryId INT NOT NULL REFERENCES invCategories(categoryId) '
                      'ON UPDATE CASCADE ON DELETE SET NULL, anchorable BOOL NOT NULL'
                      ');')
             cur.execute(query)
@@ -111,7 +111,6 @@ class sdeParser:
                     ',corridor BOOL NOT NULL ,fringe BOOL NOT NULL ,hub BOOL NOT NULL ,international BOOL NOT NULL'
                     ',luminosity FLOAT NOT NULL ,radius FLOAT NOT NULL '
                     ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
-            cur.execute(query)
 
             if self._config.extendedCoordinates :
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
@@ -146,12 +145,11 @@ class sdeParser:
                     'NOT NULL REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL '
                     ',locked BOOL NOT NULL ,radius INT NOT NULL '
                     ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
-                    ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, starId) ON CONFLICT FAIL '
                     ');')
             cur.execute(query)
 
             #star index
-            query = 'CREATE UNIQUE INDEX starId ON mapstars(starId);'
+            query = 'CREATE UNIQUE INDEX starId ON mapStars(solarSystemId, starId);'
             cur.execute(query)
 
             #Moons - SQLite
@@ -164,10 +162,14 @@ class sdeParser:
             cur.execute(query)
 
             #star index
-            query = 'CREATE UNIQUE INDEX moonId ON mapstars(moonId);'
+            query = 'CREATE UNIQUE INDEX moonId ON mapMoons(moonId);'
             cur.execute(query)
+            cur.close()
         
     def parseData(self):
+        self._parseCategories(Path(self._yamlDirectory).joinpath('fsd','categoryID.yaml'))
+        self._parseGroups(Path(self._yamlDirectory).joinpath('fsd','groupID.yaml'))
+        self._parseTypes(Path(self._yamlDirectory).joinpath('fsd','typeID.yaml'))
         universeDirectory = Path(self._yamlDirectory).joinpath('fsd','universe')
         if self._config.withKSpace:
             self._readDirectory(universeDirectory.joinpath('eve'))
@@ -178,22 +180,76 @@ class sdeParser:
         if self._config.withVoid:
             self._readDirectory(universeDirectory.joinpath('void'))
 
-    def _parseType(self):
-        pass
+    def _parseTypes(self,pathObject):
+        with pathObject.open() as file:
+            yTypes = yaml.safe_load(file)
+            if self._dbType == DatabaseType.SQLITE:
+                cur = self._dbDriver.connection.cursor()
+            try:
+                for type in yTypes:
+                    query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId, published, volume) VALUES (:id ,:groupId, :name, :iconId, :published, :volume)')
+                    cur.execute(query,{'id':type["typeId"], 'groupId': type["groupId"],
+                                       'name':type["name"]["en"], 'iconId': type["iconId"],
+                                       'published': type["published"], 'volume': type["volume"]})
+            except:
+                cur.connection.rollback()
+            cur.connection.commit()
+            cur.close()
     
-    def _parseGroups(self):
-        pass
+    def _parseGroups(self,pathObject):
+        with pathObject.open() as file:
+            yGroups = yaml.safe_load(file)
+            if self._dbType == DatabaseType.SQLITE:
+                cur = self._dbDriver.connection.cursor()
+            try:
+                for group in yGroups:
+                    query = ('INSERT INTO invGroups(groupId, categoryId, categoryName, anchorable) VALUES (:id ,:catId, :name, :anchor)')
+                    cur.execute(query,{'id':group["groupId"],'catId': group["categoryId"], 'name':group["name"]["en"], 'anchor': group["anchorable"]})
+            except:
+                cur.connection.rollback()
+            cur.connection.commit()
+            cur.close()
 
-    def _parseCategories(self):
-        pass
+    def _parseCategories(self,pathObject):
+        with pathObject.open() as file:
+            yCategories = yaml.safe_load(file)
+            if self._dbType == DatabaseType.SQLITE:
+                cur = self._dbDriver.connection.cursor()
+            try:
+                for category in yCategories:
+                    query = ('INSERT INTO invCategories(categoryID, categoryName, published) VALUES (:id ,:name, :publish)')
+                    cur.execute(query,{'id': category["categoryId"], 'name':category["name"]["en"], 'publish': category["published"]})
+            except:
+                cur.connection.rollback()
+            cur.connection.commit()
+            cur.close()
 
     def _parseSolarSystem(self,pathObject):
-        pass
+        with pathObject.open() as file:
+            yTypes = yaml.safe_load(file)
+            self._parseMoons()
+            self._parseGates()
+            self._parsePlanets()
+            self._parseStar()
 
     def _parseConstellation(self,pathObject):
-        pass
+        with pathObject.open() as file:
+            yTypes = yaml.safe_load(file)
 
     def _parseRegion(self,pathObject):
+        with pathObject.open() as file:
+            yTypes = yaml.safe_load(file)
+    
+    def _parseGates(self):
+        pass
+
+    def _parseMoons(self):
+        pass
+
+    def _parsePlanets(self):
+        pass
+
+    def _parseStar(self):
         pass
 
     @classmethod

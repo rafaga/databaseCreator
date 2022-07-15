@@ -5,11 +5,11 @@ import requests
 import os
 import bz2
 
-from sqlalchemy import false
 from databaseUtils import DatabaseUtils
 from pathlib import Path
 import xml.etree.ElementTree
 import zipfile
+import shutil
 from sdeParser import sdeParser,sdeConfig
 
 fuzzDbUrl = 'https://www.fuzzwork.co.uk/dump/'
@@ -96,7 +96,7 @@ def downloadFile(url, filename = None):
                 bytes_downloaded += len(chunk)
                 kbDownloaded = round(bytes_downloaded/1024)
                 if total_length > 0:
-                    percentDownloaded = bytes_downloaded/total_length
+                    percentDownloaded = round((bytes_downloaded/total_length)*100,2)
                 print('Downloading: %d kb [%s%%]\r'%(kbDownloaded,percentDownloaded),end="")
     return bytes_downloaded
 
@@ -123,6 +123,7 @@ def bz2Decompress(compressedFilePath,uncompressedFilePath):
 def zipDecompress(compressedFilePath,outputPath):
     with zipfile.ZipFile(compressedFilePath, 'r') as zip_ref:
         zip_ref.extractall(outputPath)
+        print('SDE: Decompressing File')
 
 source = []
 if fromFuzzWorks:
@@ -132,8 +133,8 @@ if fromFuzzWorks:
     source.append(fuzzDbUrl + fuzzDbName)
     source.append(os.path.join('.',fuzzDbName))
 else:
+    source.append(os.path.join('.','checksum'))
     source.append(os.path.join('.','sde.md5'))
-    source.append(os.path.join('.','sde.md5.old'))
     source.append(sdeUrl + sdeChecksum)
     source.append(sdeUrl + sdeFileName)
     source.append(os.path.join('.',sdeFileName))
@@ -160,13 +161,15 @@ else:
 """ we take an action based on what was detected """ 
 if updateDetected:
     print("SDE: a new version has been detected, proceding to download")
-    os.rename(source[0],source[1])
+    if Path(source[0]).exists():
+        os.rename(source[0],source[1])
     if Path(source[4]).exists():
         print("A previous version has been detected... deleting")
         os.remove(source[4])
     # if Fuzzworks is not being used, then we delete the uncompessed directory
-    if not fromFuzzWorks:
-        os.removedirs(os.path.join('.','sde'))
+    sdePath = Path().joinpath('.','sde')
+    if not fromFuzzWorks and sdePath.exists():
+        shutil.rmtree(sdePath)
     mbytesDownloaded = downloadFile(source[3])/(1024*1024)
     print("SDE: Downloaded %0.2f Mb          "%mbytesDownloaded)
 else:
