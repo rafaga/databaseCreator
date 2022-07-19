@@ -66,3 +66,17 @@ class DatabaseDriver:
             self.__datasource = dataSourceString
             self.__connection = sqlite3.connect(dataSourceString)
 
+    def execute(self,query,params=None,delayCommit=False):
+        if self.databaseType == DatabaseType.SQLITE:
+            cur = self.connection.cursor()
+            try:
+                if params is None:
+                    cur.execute(query)
+                else:
+                    cur.execute(query,params)
+            except:
+                cur.connection.rollback()
+            if not delayCommit :
+                cur.connection.commit()
+            cur.close() 
+

@@ -10,7 +10,7 @@ from pathlib import Path
 import xml.etree.ElementTree
 import zipfile
 import shutil
-from sdeParser import sdeParser,sdeConfig
+from sdeParser import sdeParser
 
 fuzzDbUrl = 'https://www.fuzzwork.co.uk/dump/'
 sdeUrl = 'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/'
@@ -187,7 +187,7 @@ if fromFuzzWorks:
     processor.syncTables()
     processor.addAdditionalData()
 else:
-    zipDecompress(source[4],os.path.join('.','sde'))
+    zipDecompress(source[4],os.path.join('.'))
     processor = sdeParser(os.path.join('.','sde'),source[5])
     processor.configuration.extendedCoordinates = False
     processor.configuration.mapAbbysal = False
