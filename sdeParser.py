@@ -163,7 +163,7 @@ class sdeParser:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
                           ',minX FLOAT NOT NULL ,minY FLOAT NOT NULL ,minZ FLOAT NOT NULL ')
 
-            query += (',regional BOOL NOT NULL, security FLOAT NOT NULL, securityClass FLOAT NOT NULL '
+            query += (',regional BOOL NOT NULL, security FLOAT NOT NULL, securityClass TEXT'
                       ');')
             self._dbDriver.execute(query,delayCommit=True)
 
@@ -217,7 +217,7 @@ class sdeParser:
             query = ('CREATE TABLE IF NOT EXISTS mapMoons (moonId INT NOT NULL ,solarSystemId INT '
                     'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
                     'moonIndex INT NOT NULL, positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL , '
-                    'positionZ FLOAT NOT NULL, radius INT NOT NULL,'
+                    'positionZ FLOAT NOT NULL, radius INT,'
                     'typeId INT REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, moonId) ON CONFLICT FAIL '
                     ');')
@@ -274,15 +274,13 @@ class sdeParser:
                 params['id'] = type[0]
                 params['name'] = type[1]['name']['en']
                 params['groupId'] = type[1]["groupID"]
+                params['iconId'] = None
                 if 'iconID' in type[1]:
                     params['iconId'] = type[1]["iconID"]
-                else:
-                    params['iconId'] = None
                 params['published'] =  type[1]["published"]
+                params['volume'] = None
                 if 'volume' in type[1]:
                     params['volume'] = type[1]["volume"]
-                else:
-                    params['volume'] = None
                 self._dbDriver.execute(query, params)
                 cont+=1
                 print(f'SDE: parsing {total} Types [{round((cont / total)*100,2)}%]  \r',end="")
@@ -361,7 +359,9 @@ class sdeParser:
                 params['maxZ'] = element['max'][2]
             params['regional'] = element['regional']
             params['security'] = element['security']
-            params['securityClass'] = element['securityClass']
+            params['securityClass'] = None
+            if 'securityClass' in element:
+                params['securityClass'] = element['securityClass']
             self._dbDriver.execute(query, params)
 
             self._parseGates(element['stargates'])
@@ -413,15 +413,13 @@ class sdeParser:
             params['id'] = region['regionID']
             self._Location[self._counter]["id"] = region['regionID']
             params['name'] = self._Location[self._counter]["name"]
+            params['factionId'] = None
             if 'factionID' in region:
                 params['factionId'] = region['factionID']
-            else:
-                params['factionId'] = None
             params['nebula'] = region["nebula"]
+            params['whclass'] = None
             if 'wormholeClassID' in region:
                 params['whclass'] =  region["wormholeClassID"]
-            else:
-                params['whclass'] = None
             params['centerX'] = region["center"][0]
             params['centerY'] = region["center"][1]
             params['centerZ'] = region["center"][2]
@@ -458,7 +456,9 @@ class sdeParser:
             params['solarSystemId'] = self._Location[2]['id']
             params['moonIndex'] = cont
             params['typeId'] = element[1]["typeID"]
-            params['radius'] = element[1]['statistics']['radius']
+            params['radius'] = None
+            if 'statistics' in element[1]:
+                params['radius'] = element[1]['statistics']['radius']
             params['positionX'] = element[1]['position'][0]
             params['positionY'] = element[1]['position'][1]
             params['positionZ'] = element[1]['position'][2]
