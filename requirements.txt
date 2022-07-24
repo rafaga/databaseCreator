@@ -1,0 +1,4 @@
+
+PyYAML>=6.0
+classutilities>=0.2.1
+

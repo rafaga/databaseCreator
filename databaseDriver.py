@@ -15,24 +15,29 @@ class DatabaseDriver:
     """Module that works as a simple abstraction layer for database operations"""
     # Internal Variables
     __databaseType = None
-    __datasource = None
+    __dataSource = None
 
     # Propiedades
     @property
     def dataSource(self):
         """the database file name"""
-        return self.__datasource
+        return self.__dataSource
 
     @dataSource.setter
-    def dataSource(self, dataSourceString):
+    def dataSource(self, dataSource):
         # a validation should be done here
         if self.databaseType == DatabaseType.SQLITE:
-            dbfile = Path(dataSourceString)
-            if dbfile.exists and dbfile.is_file():
-                if self.__isSqLite3(dbfile):
-                    self.__createConnection(dataSourceString)
+            if isinstance(dataSource,Path):
+                self.__dataSource = dataSource
+            if isinstance(dataSource,str):
+                self.__dataSource = Path(dataSource)
+            if self.__dataSource.exists() and self.__dataSource.is_file():
+                if self.__isSqLite3(self.__dataSource):
+                    self.__createConnection(self.__dataSource)
             else:
-                self.__createConnection(dataSourceString)
+                self.__createConnection(self.__dataSource)
+        if dataSource is None:
+            self.__dataSource = None
 
     @property
     def databaseType(self):
@@ -49,7 +54,7 @@ class DatabaseDriver:
         if databaseType is databaseType.NONE:
             raise(NotImplementedError)
         self.__databaseType=databaseType
-        if len(datasourceString) is not None:
+        if datasourceString is not None:
             self.dataSource=datasourceString
         
     def __isSqLite3(self,databaseFile):
@@ -57,26 +62,12 @@ class DatabaseDriver:
         # SQLite database file header is 100 bytes
         if databaseFile.stat().st_size < 100:
             return False
-        with open(file, 'rb') as file:
+        with open(databaseFile, 'rb') as file:
             header = file.read(100)
         return header[:16] == b'SQLite format 3\x00'
     
     def __createConnection(self, dataSourceString):
         if self.databaseType == DatabaseType.SQLITE:
-            self.__datasource = dataSourceString
-            self.__connection = sqlite3.connect(dataSourceString)
+            self.__connection = sqlite3.connect(self.__dataSource.resolve())
 
-    def execute(self,query,params=None,delayCommit=False):
-        if self.databaseType == DatabaseType.SQLITE:
-            cur = self.connection.cursor()
-            try:
-                if params is None:
-                    cur.execute(query)
-                else:
-                    cur.execute(query,params)
-            except:
-                cur.connection.rollback()
-            if not delayCommit :
-                cur.connection.commit()
-            cur.close() 
 
