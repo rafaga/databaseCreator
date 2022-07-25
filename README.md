@@ -1,16 +1,25 @@
 # databaseCreator
 
-This code is at experimental stage
+Utility to dump SDE data into a ralational database
 
-Utility to dump SDE data into a database
+Supported Databases:
 
-What it does:
+  * SQLite
 
-  * Download the SDE and rebuild a relational database based on it.
-  * ~~Download the most recent SQLite SDE database from fuzzworks (rework)~~
-  * Drop all the uneeded tables, and removes unnecesary fields in some tables
-  * Add Data about Jove Observatories and Triglavian invasion.
-  * Add the data about IceBelts and coordinate of system based on abstraction layout 
+The tool can be customized to import just what do you need, and discard everything else
+
+What data it is exported
+
+  * Solar Systems (Planets, Moons, Stars)
+  * Regions
+  * Constellations
+  * NPC stations
+  * Gates
+
+TODO:
+
+  * support more databases engines
+  * support more customizing settings
 
 Requirements:
   Python 3.8 or above
