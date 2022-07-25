@@ -21,6 +21,9 @@ TODO:
   * support more databases engines
   * support more customizing settings
 
-Requirements:
-  Python 3.8 or above
+Dependencies:
+
+  * Python >= 3.8.0
+  * PyYAML >= 6.0
+  * classutilities >= 0.2.1
   

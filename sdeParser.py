@@ -577,6 +577,9 @@ class sdeParser:
         cur = self._dbDriver.connection.cursor()
         cur.execute(query)
         self._dbDriver.connection.commit()
+        if self._dbType == DatabaseType.SQLITE:
+            query = 'VACUUM;'
+            cur.execute(query)
         cur.close()
 
     @classmethod

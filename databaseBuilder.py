@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """This script download the EVE online's Tranquility Server Database and discard all the non-escential data """
-from databaseUtils import DatabaseUtils
 from pathlib import Path
 import shutil
 from externalParser import externalParser
@@ -15,7 +14,6 @@ fuzzDbName = 'sqlite-latest.sqlite.bz2'
 sdeFileName = 'sde.zip'
 sdeChecksum = 'checksum' 
 outFileName = 'smt.db'
-chunkSize = 2391975
 miscUtils.chunkSize = 2391975
 updateDetected = False
 fromFuzzWorks = False
@@ -76,23 +74,19 @@ if source[5].exists():
 
 # decompressing the database 
 if fromFuzzWorks:
-    miscUtils.bz2Decompress(source[4],source[5])
-    """ We have the SDE database in all its full glory, let's to slim dat thicc file now """
-    processor = DatabaseUtils(source[5])
-    processor.syncTables()
-    processor.addAdditionalData()
+    # TODO
+    pass
 else:
     miscUtils.zipDecompress(source[4],Path('.'))
-
-processor = sdeParser(Path('.').joinpath('sde'),source[5])
-processor.configuration.extendedCoordinates = False
-processor.configuration.mapAbbysal = False
-processor.configuration.mapKSpace= True
-processor.configuration.mapVoid = False
-processor.configuration.mapWSpace = False
-processor.createTableStructure()
-processor.parseData()
-processor.close()
+    processor = sdeParser(Path('.').joinpath('sde'),source[5])
+    processor.configuration.extendedCoordinates = False
+    processor.configuration.mapAbbysal = False
+    processor.configuration.mapKSpace= True
+    processor.configuration.mapVoid = False
+    processor.configuration.mapWSpace = False
+    processor.createTableStructure()
+    processor.parseData()
+    processor.close()
 
 if processor is not None:
     eParser = externalParser(Path('.').joinpath('maps'),Path(outFileName))
