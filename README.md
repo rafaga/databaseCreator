@@ -27,3 +27,10 @@ Dependencies:
   * PyYAML >= 6.0
   * classutilities >= 0.2.1
   
+How to use it:
+ 
+ Linux/UNIX: Make databaseBuilder.py executable using ```chmod u+x databaseBuilder.py```
+ 
+ Run directly from shell ```./databaseBuilder.py```
+ 
+ or using python ```python3 ./databaseBuilder.py```
