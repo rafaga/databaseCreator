@@ -37,6 +37,3 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
-    - name: running application
-      run: |
-        python3 databaseBuilder.py
