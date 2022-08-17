@@ -5,18 +5,21 @@ from databaseDriver import DatabaseDriver, DatabaseType
 import yaml
 from pathlib import Path
 
+
 class sdeConfig:
-    extendedCoordinates=True
-    mapKSpace=True
-    mapWSpace=True
-    mapAbbysal=True
-    mapVoid=False
-    #TODO: implement these flags, these flags depend upon map Flags.
-    mapMoons=True
-    mapGates=True
+    extendedCoordinates = True
+    mapKSpace = True
+    mapWSpace = True
+    mapAbbysal = True
+    mapVoid = False
+    # TODO: implement these flags, these flags depend upon map Flags.
+    mapMoons = True
+    mapGates = True
+
 
 class DirectoryNotFoundError(Exception):
     pass
+
 
 class sdeParser:
     # Propiedades
@@ -27,7 +30,7 @@ class sdeParser:
     # this counter permits to detect what item we are iterating now
     _counter = -1
     # this representes the current location (Region,Constellation,System)
-    _Location = [{"name":None, "id":None},{"name":None, "id":None},{"name":None, "id":None}]
+    _Location = [{"name": None, "id": None}, {"name": None, "id": None}, {"name": None, "id": None}]
 
     @property
     def configuration(self):
@@ -43,18 +46,18 @@ class sdeParser:
         self._yamlDirectory = filename
 
     # Constructor
-    def __init__(self, directory, databaseFile, type = DatabaseType.SQLITE):
+    def __init__(self, directory, databaseFile, type=DatabaseType.SQLITE):
         if Path(directory).is_dir():
-            self.yamlDirectory= directory
+            self.yamlDirectory = directory
         else:
             raise(DirectoryNotFoundError('The specified directory does not exists.'))
         if type == DatabaseType.SQLITE:
             print("SDE: Using SQLite as Database Engine...")
-        self._dbDriver = DatabaseDriver(type,databaseFile)
+        self._dbDriver = DatabaseDriver(type, databaseFile)
         self._dbType = type
         self._config = sdeConfig()
 
-    def _readDirectory(self, directoryPath): 
+    def _readDirectory(self, directoryPath):
         for element in directoryPath.iterdir():
             if element.is_dir():
                 self._counter += 1
@@ -67,15 +70,15 @@ class sdeParser:
             if element.is_file() and element.name == "solarsystem.staticdata":
                 self._parseSolarSystem(element)
 
-    #Not used for now
-    def spinner(self, value, lenght=3, width=7, message = None):
-        print('[',end='')
-        calculatedValue = (value%lenght)
-        for x in range(0,width):
-            if x >= calculatedValue  or x < calculatedValue-lenght:
-                print('▉',end='')
+    # Not used for now
+    def spinner(self, value, lenght=3, width=7, message=None):
+        print('[', end='')
+        calculatedValue = (value % lenght)
+        for x in range(0, width):
+            if x >= calculatedValue or x < calculatedValue - lenght:
+                print('▉', end='')
             else:
-                print(' ',end='')
+                print(' ', end='')
         if message is not None:
             print('] ' + message)
         else:
@@ -87,30 +90,30 @@ class sdeParser:
             query = 'CREATE TABLE invNames (itemId INT NOT NULL PRIMARY KEY, itemName TEXT NOT NULL);'
             cur.execute(query)
 
-            #categories - SQLite
+            # categories - SQLite
             query = ('CREATE TABLE invCategories (categoryId INT NOT NULL PRIMARY KEY'
                      ',categoryName TEXT NOT NULL ,published BOOL NOT NULL);')
             cur.execute(query)
 
-            #GroupIds - SQLite
+            # GroupIds - SQLite
             query = ('CREATE TABLE invGroups (groupId INT NOT NULL PRIMARY KEY'
                      ',groupName TEXT NOT NULL ,categoryId INT NOT NULL REFERENCES invCategories(categoryId) '
                      'ON UPDATE CASCADE ON DELETE SET NULL, anchorable BOOL NOT NULL'
                      ');')
             cur.execute(query)
 
-            #InvType - SQLite
+            # InvType - SQLite
             query = ('CREATE TABLE invTypes (typeId INT NOT NULL PRIMARY KEY '
-                    ',groupId INT REFERENCES invGroups(groupId) ON UPDATE CASCADE ON DELETE SET NULL'
-                    ',iconId INT, typeName TEXT NOT NULL, published BOOL NOT NULL, volume FLOAT '
-                    ');')
+                     ',groupId INT REFERENCES invGroups(groupId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ',iconId INT, typeName TEXT NOT NULL, published BOOL NOT NULL, volume FLOAT '
+                     ');')
             cur.execute(query)
 
-            #Races - SQLite
+            # Races - SQLite
             query = 'CREATE TABLE races (raceId INT NOT NULL PRIMARY KEY, raceName TEXT NOT NULL);'
             cur.execute(query)
 
-            #Corporations - SQLite TODO and WIP
+            # Corporations - SQLite TODO and WIP
             query = ('CREATE TABLE npcCorporations (corporationId INT NOT NULL PRIMARY KEY '
                      ',corporationName TEXT NOT NULL, tickerName TEXT NOT NULL, deleted BOOL NOT NULL'
                      ',iconId INT NOT NULL'
@@ -118,54 +121,53 @@ class sdeParser:
                      ');')
             cur.execute(query)
 
-
-            #Factions - SQLite
+            # Factions - SQLite
             query = ('CREATE TABLE factions (factionId INT NOT NULL PRIMARY KEY, factionName TEXT NOT NULL '
                      ',iconId INT NOT NULL ,sizeFactor FLOAT NOT NULL ,uniqueName BOOL NOT NULL '
                      ',corporationId INT REFERENCES npcCorporations(corporationId) ON UPDATE CASCADE ON DELETE SET NULL '
                      ');')
             cur.execute(query)
 
-            #Faction-Races -SQLite
+            # Faction-Races -SQLite
             query = ('CREATE TABLE factionRace ('
                      'factionId INT REFERENCES factions(factionId) ON UPDATE CASCADE ON DELETE SET NULL'
                      ',raceId INT REFERENCES races(raceId) ON UPDATE CASCADE ON DELETE SET NULL'
                      ',CONSTRAINT pkey PRIMARY KEY (factionId,raceId) ON CONFLICT FAIL);')
             cur.execute(query)
 
-            #Regions - SQLite
+            # Regions - SQLite
             query = ('CREATE TABLE mapRegions (regionId INT NOT NULL PRIMARY KEY'
                      ',regionName TEXT NOT NULL, nebula INT NOT NULL, wormholeClassId INT '
                      ',factionId INT REFERENCES factions(factionId) ON UPDATE CASCADE ON DELETE SET NULL '
                      ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
 
-            if self._config.extendedCoordinates :
+            if self._config.extendedCoordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
                           ',minX FLOAT NOT NULL ,minY FLOAT NOT NULL ,minZ FLOAT NOT NULL ')
             query += ');'
             cur.execute(query)
 
-            #Constelations - SQLite
+            # Constelations - SQLite
             query = ('CREATE TABLE mapConstellations (constellationId INT NOT NULL PRIMARY KEY '
                      ',constellationName TEXT NOT NULL ,regionId INT NOT NULL REFERENCES '
                      'mapRegions(regionId) ON UPDATE CASCADE ON DELETE SET NULL ,radius FLOAT NOT NULL '
                      ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
 
-            if self._config.extendedCoordinates :
+            if self._config.extendedCoordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
                           ',minX FLOAT NOT NULL ,minY FLOAT NOT NULL ,minZ FLOAT NOT NULL ')
             query += ');'
             cur.execute(query)
 
-            #SolarSystems - SQLite
+            # SolarSystems - SQLite
             query = ('CREATE TABLE mapSolarSystems (solarSystemId INT NOT NULL PRIMARY KEY'
-                    ',solarSystemName TEXT NOT NULL ,constellationId INT REFERENCES '
-                    'mapConstellations(constellationId) ON UPDATE CASCADE ON DELETE SET NULL'
-                    ',corridor BOOL NOT NULL ,fringe BOOL NOT NULL ,hub BOOL NOT NULL ,international BOOL NOT NULL'
-                    ',luminosity FLOAT NOT NULL ,radius FLOAT NOT NULL '
-                    ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
+                     ',solarSystemName TEXT NOT NULL ,constellationId INT REFERENCES '
+                     'mapConstellations(constellationId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ',corridor BOOL NOT NULL ,fringe BOOL NOT NULL ,hub BOOL NOT NULL ,international BOOL NOT NULL'
+                     ',luminosity FLOAT NOT NULL ,radius FLOAT NOT NULL '
+                     ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
 
-            if self._config.extendedCoordinates :
+            if self._config.extendedCoordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
                           ',minX FLOAT NOT NULL ,minY FLOAT NOT NULL ,minZ FLOAT NOT NULL ')
 
@@ -173,7 +175,7 @@ class sdeParser:
                       ');')
             cur.execute(query)
 
-            #faction/solarsystem- - SQLite
+            # faction/solarsystem- - SQLite
             query = ('CREATE TABLE factionSolarSystem ('
                      'solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
                      ',factionId INT REFERENCES factions(factionId) ON UPDATE CASCADE ON DELETE SET NULL'
@@ -181,11 +183,11 @@ class sdeParser:
                      ');')
             cur.execute(query)
 
-            #faction/solarSystem Index
+            # faction/solarSystem Index
             query = 'CREATE UNIQUE INDEX factionId ON factionSolarSystem (factionId);'
             cur.execute(query)
 
-            #Gates - SQLite (typeId here)
+            # Gates - SQLite (typeId here)
             query = ('CREATE TABLE mapSystemGates (systemGateId INT NOT NULL '
                      ',solarSystemID INT NOT NULL REFERENCES mapSolarSystems(solarSystemId) '
                      'ON UPDATE CASCADE ON DELETE SET NULL ,typeId INT NOT NULL '
@@ -195,41 +197,41 @@ class sdeParser:
                      ');')
             cur.execute(query)
 
-            #Planets - SQLite (typeId here)
+            # Planets - SQLite (typeId here)
             query = ('CREATE TABLE mapPlanets (planetId INT NOT NULL PRIMARY KEY'
-                    ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
-                    ' ,planetaryIndex INT NOT NULL, fragmented BOOL NOT NULL, radius FLOAT NOT NULL, locked BOOL NOT NULL '
-                    ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
-                    ',positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL ,positionZ FLOAT NOT NULL '
-                    ');')
+                     ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ' ,planetaryIndex INT NOT NULL, fragmented BOOL NOT NULL, radius FLOAT NOT NULL, locked BOOL NOT NULL '
+                     ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
+                     ',positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL ,positionZ FLOAT NOT NULL '
+                     ');')
             cur.execute(query)
 
             query = 'CREATE UNIQUE INDEX planetSystem ON mapPlanets(solarSystemId, planetaryIndex);'
             cur.execute(query)
 
-            #Stars - SQLite (typeId Here)
+            # Stars - SQLite (typeId Here)
             query = ('CREATE TABLE mapStars (starId INT NOT NULL PRIMARY KEY ,solarSystemId INT '
-                    'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL '
-                    ',locked BOOL NOT NULL ,radius INT NOT NULL '
-                    ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
-                    ');')
+                     'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL '
+                     ',locked BOOL NOT NULL ,radius INT NOT NULL '
+                     ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
+                     ');')
             cur.execute(query)
 
-            #star index
+            # star index
             query = 'CREATE UNIQUE INDEX starId ON mapStars (solarSystemId, starId);'
             cur.execute(query)
 
-            #Moons - SQLite
+            # Moons - SQLite
             query = ('CREATE TABLE mapMoons (moonId INT NOT NULL ,solarSystemId INT '
-                    'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
-                    'moonIndex INT NOT NULL, positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL , '
-                    'positionZ FLOAT NOT NULL, radius INT,'
-                    'typeId INT REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
-                    ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, moonId) ON CONFLICT FAIL '
-                    ');')
+                     'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
+                     'moonIndex INT NOT NULL, positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL , '
+                     'positionZ FLOAT NOT NULL, radius INT,'
+                     'typeId INT REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
+                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, moonId) ON CONFLICT FAIL '
+                     ');')
             cur.execute(query)
 
-            #Stations - SQLite
+            # Stations - SQLite
             query = ('CREATE TABLE staStation (idStation INT NOT NULL PRIMARY KEY ,stationName TEXT NOT NULL'
                      ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
                      ',stationType INT NOT NULL'
@@ -238,26 +240,25 @@ class sdeParser:
             # Corporation/Station - SQLite
             # ',stationId INT REFERENCES stations(stationId) ON UPDATE CASCADE ON DELETE SET NULL'
             query = ('CREATE TABLE staCorporations ('
-                    ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
-                    ',corporationId INT REFERENCES npcCorporations(corporationId) ON UPDATE CASCADE ON DELETE SET NULL'
-                    ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, corporationId) ON CONFLICT FAIL '
-                    ');')
+                     ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ',corporationId INT REFERENCES npcCorporations(corporationId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, corporationId) ON CONFLICT FAIL '
+                     ');')
 
-
-            #star index
+            # star index
             query = 'CREATE UNIQUE INDEX moonId ON mapMoons(moonId);'
             cur.execute(query)
 
             self._dbDriver.connection.commit()
             cur.close()
             print("SDE: Tables created from scratch...")
-        
+
     def parseData(self):
         self._parseNames()
-        self._parseCategories(Path(self._yamlDirectory).joinpath('fsd','categoryIDs.yaml'))
-        self._parseGroups(Path(self._yamlDirectory).joinpath('fsd','groupIDs.yaml'))
-        self._parseTypes(Path(self._yamlDirectory).joinpath('fsd','typeIDs.yaml'))
-        universeDirectory = Path(self._yamlDirectory).joinpath('fsd','universe')
+        self._parseCategories(Path(self._yamlDirectory).joinpath('fsd', 'categoryIDs.yaml'))
+        self._parseGroups(Path(self._yamlDirectory).joinpath('fsd', 'groupIDs.yaml'))
+        self._parseTypes(Path(self._yamlDirectory).joinpath('fsd', 'typeIDs.yaml'))
+        universeDirectory = Path(self._yamlDirectory).joinpath('fsd', 'universe')
         if self._config.mapKSpace:
             print('SDE: parsing High,Low and Nullsec Systems')
             self._readDirectory(universeDirectory.joinpath('eve'))
@@ -271,13 +272,13 @@ class sdeParser:
             print('SDE: parsing Void Systems')
             self._readDirectory(universeDirectory.joinpath('void'))
 
-    def _parseTypes(self,pathObject):
+    def _parseTypes(self, pathObject):
         cur = self._dbDriver.connection.cursor()
         query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId, published, volume) VALUES (:id ,:groupId, :name, :iconId, :published, :volume)')
         with pathObject.open() as file:
             yTypes = yaml.safe_load(file)
             total = len(yTypes)
-            cont=0
+            cont = 0
             for type in yTypes.items():
                 params = {}
                 params['id'] = type[0]
@@ -286,22 +287,22 @@ class sdeParser:
                 params['iconId'] = None
                 if 'iconID' in type[1]:
                     params['iconId'] = type[1]["iconID"]
-                params['published'] =  type[1]["published"]
+                params['published'] = type[1]["published"]
                 params['volume'] = None
                 if 'volume' in type[1]:
                     params['volume'] = type[1]["volume"]
                 cur.execute(query, params)
-                cont+=1
-                print(f'SDE: parsing {total} Types [{round((cont / total)*100,2)}%]  \r',end="")
+                cont += 1
+                print(f'SDE: parsing {total} Types [{round((cont / total)*100,2)}%]  \r', end="")
             print(f'SDE: {total} Types parsed           ')
         cur.close()
-    
-    def _parseGroups(self,pathObject):
+
+    def _parseGroups(self, pathObject):
         cur = self._dbDriver.connection.cursor()
         with pathObject.open() as file:
             yGroups = yaml.safe_load(file)
             total = len(yGroups)
-            cont=0
+            cont = 0
             for group in yGroups.items():
                 params = {}
                 query = ('INSERT INTO invGroups(groupId, categoryId, groupName, anchorable) VALUES (:id ,:catId, :name, :anchor)')
@@ -309,50 +310,50 @@ class sdeParser:
                 params['catId'] = group[1]["categoryID"]
                 params['name'] = group[1]["name"]["en"]
                 params['anchor'] = group[1]["anchorable"]
-                cont+=1
+                cont += 1
                 cur.execute(query, params)
-                print(f'SDE: parsing {total} groups [{round((cont / total)*100,2)}%]  \r',end="")
+                print(f'SDE: parsing {total} groups [{round((cont / total)*100,2)}%]  \r', end="")
             print(f'SDE: {total} Groups parsed            ')
         cur.close()
 
-    def _parseCategories(self,pathObject):
+    def _parseCategories(self, pathObject):
         cur = self._dbDriver.connection.cursor()
         with pathObject.open() as file:
             yCategories = yaml.safe_load(file)
             total = len(yCategories)
-            cont=0
+            cont = 0
             for category in yCategories.items():
                 params = {}
                 query = ('INSERT INTO invCategories(categoryID, categoryName, published) VALUES (:id ,:name, :publish)')
                 params['id'] = category[0]
                 params['name'] = category[1]["name"]["en"]
                 params['publish'] = category[1]["published"]
-                cont+=1
-                print(f'SDE: parsing {total} categories [{round((cont / total)*100,2)}%]  \r',end="")
+                cont += 1
+                print(f'SDE: parsing {total} categories [{round((cont / total)*100,2)}%]  \r', end="")
                 cur.execute(query, params)
             print(f'SDE: {total} Categories parsed          ')
         cur.close()
 
-    def _parseSolarSystem(self,pathObject):
+    def _parseSolarSystem(self, pathObject):
         cur = self._dbDriver.connection.cursor()
         params = {}
 
-        #query creation
+        # query creation
         query = ('INSERT INTO mapSolarSystems (solarSystemId ,solarSystemName ,constellationId '
-            ',corridor ,fringe ,hub ,international ,luminosity ,radius ,centerX ,centerY ,centerZ '
-            ',regional ,security ,securityClass ')
-        if self._config.extendedCoordinates :
-            query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ '     
+                 ',corridor ,fringe ,hub ,international ,luminosity ,radius ,centerX ,centerY ,centerZ '
+                 ',regional ,security ,securityClass ')
+        if self._config.extendedCoordinates:
+            query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ '
         query += (') VALUES ( :id, :name, :constellationId, :corridor, :fringe, :hub, :international, '
-                    ':luminosity, :radius, :centerX, :centerY, :centerZ, :regional, :security, :securityClass')  
-        if self._config.extendedCoordinates :
+                  ':luminosity, :radius, :centerX, :centerY, :centerZ, :regional, :security, :securityClass')
+        if self._config.extendedCoordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ '
         query += ');'
 
         with pathObject.open() as file:
             element = yaml.safe_load(file)
 
-            #set the solar system Id
+            # set the solar system Id
             self._Location[self._counter]['id'] = element['solarSystemID']
             self._Location[self._counter]['name'] = self._getName(element['solarSystemID'])
             print('SDE: parsing data for system ' + self._Location[self._counter]["name"])
@@ -369,7 +370,7 @@ class sdeParser:
             params['centerX'] = element['center'][0]
             params['centerY'] = element['center'][1]
             params['centerZ'] = element['center'][2]
-            if self._config.extendedCoordinates :
+            if self._config.extendedCoordinates:
                 params['minX'] = element['min'][0]
                 params['minY'] = element['min'][1]
                 params['minZ'] = element['min'][2]
@@ -388,11 +389,11 @@ class sdeParser:
             self._parseStar(element['star'])
         cur.close()
 
-    def _parseConstellation(self,pathObject):
+    def _parseConstellation(self, pathObject):
         cur = self._dbDriver.connection.cursor()
-        #query creation
+        # query creation
         query = ('INSERT INTO mapConstellations (constellationId ,constellationName ,regionId ,radius '
-            ',centerX ,centerY ,centerZ ')
+                 ',centerX ,centerY ,centerZ ')
         if self._config.extendedCoordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ'
         query += ') VALUES (:id ,:name ,:regionId ,:radius ,:centerX ,:centerY ,:centerZ '
@@ -424,11 +425,11 @@ class sdeParser:
             cur.execute(query, params)
         cur.close()
 
-    def _parseRegion(self,pathObject):
+    def _parseRegion(self, pathObject):
         cur = self._dbDriver.connection.cursor()
-        #query creation
+        # query creation
         query = ('INSERT INTO mapRegions(regionId, regionName, factionId, centerX, centerY, centerZ'
-            ',nebula ,wormholeClassId ')
+                 ',nebula ,wormholeClassId ')
         if self._config.extendedCoordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ'
         query += ') VALUES (:id , :name, :factionId, :centerX, :centerY, :centerZ, :nebula, :whclass'
@@ -451,7 +452,7 @@ class sdeParser:
             params['nebula'] = region["nebula"]
             params['whclass'] = None
             if 'wormholeClassID' in region:
-                params['whclass'] =  region["wormholeClassID"]
+                params['whclass'] = region["wormholeClassID"]
             params['centerX'] = region["center"][0]
             params['centerY'] = region["center"][1]
             params['centerZ'] = region["center"][2]
@@ -464,11 +465,11 @@ class sdeParser:
                 params['minZ'] = region["min"][2]
             cur.execute(query, params)
         cur.close()
-    
-    def _parseGates(self,node):
+
+    def _parseGates(self, node):
         cur = self._dbDriver.connection.cursor()
         query = ('INSERT INTO mapSystemGates (systemGateId, solarSystemId, typeId, positionX, positionY, positionZ)'
-            ' VALUES (:id, :solarSystemId, :typeId, :posX, :posY, :posZ );')
+                 ' VALUES (:id, :solarSystemId, :typeId, :posX, :posY, :posZ );')
         for element in node.items():
             params = {}
             params['id'] = element[0]
@@ -477,15 +478,15 @@ class sdeParser:
             params['posX'] = element[1]['position'][0]
             params['posY'] = element[1]['position'][1]
             params['posZ'] = element[1]['position'][2]
-            cur.execute(query,params)
+            cur.execute(query, params)
         cur.close()
 
-    def _parseMoons(self,node):
+    def _parseMoons(self, node):
         cur = self._dbDriver.connection.cursor()
         cont = 1
         query = ('INSERT INTO mapMoons (moonId, solarSystemId, moonIndex, typeid, radius, positionX, '
-            'positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, :typeId, :radius, :posX, '
-            ':posY, :posZ );')
+                 'positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, :typeId, :radius, :posX, '
+                 ':posY, :posZ );')
         for element in node.items():
             params = {}
             params['id'] = element[0]
@@ -498,12 +499,11 @@ class sdeParser:
             params['posX'] = element[1]['position'][0]
             params['posY'] = element[1]['position'][1]
             params['posZ'] = element[1]['position'][2]
-            cur.execute(query,params)
+            cur.execute(query, params)
             cont += 1
         cur.close()
 
-
-    def _parsePlanets(self,node):
+    def _parsePlanets(self, node):
         cur = self._dbDriver.connection.cursor()
         query = ('INSERT INTO mapPlanets (planetId, solarSystemId, planetaryIndex, fragmented, radius, locked, typeId,'
                  'positionX, positionY, positionZ) VALUES (:id, :solarSystemId, :planetIndex, :fragmented, :radius, '
@@ -520,12 +520,12 @@ class sdeParser:
             params['posX'] = element[1]['position'][0]
             params['posY'] = element[1]['position'][1]
             params['posZ'] = element[1]['position'][2]
-            cur.execute(query,params)
+            cur.execute(query, params)
             if 'moons' in element[1]:
                 self._parseMoons(element[1]['moons'])
         cur.close()
 
-    def _parseStar(self,node):
+    def _parseStar(self, node):
         params = {}
         cur = self._dbDriver.connection.cursor()
         query = ('INSERT INTO mapStars ( starId, solarSystemId, locked, radius, typeId ) VALUES '
@@ -541,10 +541,9 @@ class sdeParser:
     def _parseNames(self):
         cur = self._dbDriver.connection.cursor()
         """Load the all the names used by entities and dump it into a temp table"""
-        namesFile = Path(self.yamlDirectory).joinpath('bsd','invNames.yaml')
+        namesFile = Path(self.yamlDirectory).joinpath('bsd', 'invNames.yaml')
         if not namesFile.exists():
             raise(FileNotFoundError)
-        
         query = 'INSERT INTO invNames (itemId, itemName) VALUES (:id, :name);'
         with namesFile.open() as file:
             names = yaml.safe_load(file)
@@ -555,17 +554,17 @@ class sdeParser:
             params = {}
             params['id'] = name['itemID']
             params['name'] = name['itemName']
-            cur.execute(query,params)
-            cont+=1
-            print(f'SDE: Parsing {total} names [{round((cont / total)*100,2)}%]  \r',end="")
+            cur.execute(query, params)
+            cont += 1
+            print(f'SDE: Parsing {total} names [{round((cont / total)*100,2)}%]  \r', end="")
         cur.close()
         print(f'SDE: {total} names parsed                  ')
 
-    def _getName(self,id):
+    def _getName(self, id):
         result = ''
         cur = self._dbDriver.connection.cursor()
         query = 'SELECT itemName FROM invNames WHERE itemId = ?;'
-        rows = cur.execute(query,(id,))
+        rows = cur.execute(query, (id,))
         for row in rows:
             result = row[0]
         cur.close()
@@ -583,5 +582,5 @@ class sdeParser:
         cur.close()
 
     @classmethod
-    def fromFuzzworks(cls,databaseUrl):
+    def fromFuzzworks(cls, databaseUrl):
         raise(NotImplementedError)

@@ -7,9 +7,11 @@ import enum
 import sqlite3
 from pathlib import Path
 
+
 class DatabaseType(enum.Enum):
     NONE = 0
     SQLITE = 1
+
 
 class DatabaseDriver:
     """Module that works as a simple abstraction layer for database operations"""
@@ -27,9 +29,9 @@ class DatabaseDriver:
     def dataSource(self, dataSource):
         # a validation should be done here
         if self.databaseType == DatabaseType.SQLITE:
-            if isinstance(dataSource,Path):
+            if isinstance(dataSource, Path):
                 self.__dataSource = dataSource
-            if isinstance(dataSource,str):
+            if isinstance(dataSource, str):
                 self.__dataSource = Path(dataSource)
             if self.__dataSource.exists() and self.__dataSource.is_file():
                 if self.__isSqLite3(self.__dataSource):
@@ -49,15 +51,15 @@ class DatabaseDriver:
 
     # Constructor
     def __init__(self, databaseType=DatabaseType.NONE, datasourceString=None):
-        if not isinstance(databaseType,DatabaseType):
+        if not isinstance(databaseType, DatabaseType):
             raise(IndexError)
         if databaseType is databaseType.NONE:
             raise(NotImplementedError)
-        self.__databaseType=databaseType
+        self.__databaseType = databaseType
         if datasourceString is not None:
-            self.dataSource=datasourceString
-        
-    def __isSqLite3(self,databaseFile):
+            self.dataSource = datasourceString
+
+    def __isSqLite3(self, databaseFile):
         """Function that checks if given file has a valid SQLite format"""
         # SQLite database file header is 100 bytes
         if databaseFile.stat().st_size < 100:
@@ -65,9 +67,7 @@ class DatabaseDriver:
         with open(databaseFile, 'rb') as file:
             header = file.read(100)
         return header[:16] == b'SQLite format 3\x00'
-    
+
     def __createConnection(self, dataSourceString):
         if self.databaseType == DatabaseType.SQLITE:
             self.__connection = sqlite3.connect(self.__dataSource.resolve())
-
-

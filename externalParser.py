@@ -1,10 +1,12 @@
 # -*- coding: UTF-8 -*-
+from sqlite3 import DatabaseError
 from databaseDriver import DatabaseDriver, DatabaseType
-from sdeParser import DirectoryNotFoundError
 import xml.etree.ElementTree
 from pathlib import Path
 from miscUtils import miscUtils
 from urllib.parse import urlparse
+import csv
+
 
 class externalParser:
     """Parse data from different sources and integrate into the SDE database"""
@@ -16,13 +18,13 @@ class externalParser:
     def dataDirectory(self):
         """the output directory for all downloaded data"""
         return self._dataDirectory
-    
+
     @dataDirectory.setter
-    def dataDirectory(self,value):
-        if isinstance(value,Path):
+    def dataDirectory(self, value):
+        if isinstance(value, Path):
             if value.is_dir():
-                self._dataDirectory= value
-        if isinstance(value,str):
+                self._dataDirectory = value
+        if isinstance(value, str):
             self._dataDirectory = Path(value)
 
     @property
@@ -31,38 +33,38 @@ class externalParser:
         return self._mapUrl
 
     @mapUrl.setter
-    def mapUrl(self,value):
+    def mapUrl(self, value):
         self._mapUrl = value
 
-    def __init__(self, directory, databaseFile, type = DatabaseType.SQLITE):
+    def __init__(self, directory, databaseFile, type=DatabaseType.SQLITE):
         if type == DatabaseType.SQLITE:
-            self.dataDirectory=directory
+            self.dataDirectory = directory
             print("Misc: Using SQLite as Database Engine...")
-        self._dbDriver = DatabaseDriver(type,databaseFile)
+        self._dbDriver = DatabaseDriver(type, databaseFile)
         self._dbType = type
 
     def _updateTables(self):
         cur = self._dbDriver.connection.cursor()
 
         print("SMT: Creating Triglavian Status Catalog Table")
-        cur.execute('CREATE TABLE mapTriglavianStatus (trigStatusID INT NOT NULL PRIMARY KEY,'
+        cur.execute('CREATE TABLE mapTriglavianStatus (trigStatusId INT NOT NULL PRIMARY KEY,'
                     'trigStatusName TEXT NOT NULL);')
 
         print("SMT: Filling Triglavian Status Table")
-        values = ([ 0, 'None'],
-                    [ 1, 'Edencom Minor Victory'],
-                    [ 2, 'Final Liminality'],
-                    [ 3, 'Fortress'],
-                    [ 4, 'Triglavian Minor Victory'],)
+        values = ([0, 'None'],
+                  [1, 'Edencom Minor Victory'],
+                  [2, 'Final Liminality'],
+                  [3, 'Fortress'],
+                  [4, 'Triglavian Minor Victory'],)
         query = ('INSERT INTO mapTriglavianStatus(trigStatusID,trigStatusName)'
-                    ' VALUES(?,?);')
+                 ' VALUES(?,?);')
         cur.executemany(query, values)
 
         print("SMT: Creating Regional Abstract Map Table")
-        cur.execute('CREATE TABLE mapAbstractSystems (solarSystemID INT '
-                    'REFERENCES mapSolarSystems(solarSystemID) ON UPDATE CASCADE ON DELETE SET NULL,'
-                    'regionID INT NOT NULL REFERENCES mapRegions(RegionID) ON UPDATE CASCADE ON DELETE SET NULL,'
-                    'x INT NOT NULL, y INT NOT NULL, CONSTRAINT pkey PRIMARY KEY (solarSystemID, regionID) '
+        cur.execute('CREATE TABLE mapAbstractSystems (solarSystemId INT '
+                    'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL,'
+                    'regionId INT NOT NULL REFERENCES mapRegions(RegionId) ON UPDATE CASCADE ON DELETE SET NULL,'
+                    'x INT NOT NULL, y INT NOT NULL, CONSTRAINT pkey PRIMARY KEY (solarSystemId, regionId) '
                     'ON CONFLICT FAIL);')
 
         print("SMT: Adding IceBelt, Jove Observatory and Triglavian Invasion fields to the mapSolarSystems")
@@ -71,12 +73,12 @@ class externalParser:
         cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN trigStatusID INT DEFAULT 0 '
                     'REFERENCES mapTriglavianStatus (trigStatusID) ON UPDATE CASCADE ON DELETE SET NULL;')
 
-        #indexes
+        # indexes
         print("SMT: Creating Indexes")
         cur.execute('CREATE INDEX icebelts ON mapSolarSystems (solarSystemId, iceBelt);')
         cur.execute('CREATE INDEX joveSystems ON mapSolarSystems (solarSystemId, joveObservatory);')
 
-        #Adding Edecom Minor victory systems
+        # Adding Edecom Minor victory systems
         print("SMT: Adding Triglavian Systems with their correspondent status")
         cur.execute('UPDATE mapSolarSystems SET trigStatusID=1 WHERE solarSystemID IN (30003088,30003894'
                     ',30004302,30005074,30003570,30003463,30003788,30002724,30002999,30000102,30003919'
@@ -88,15 +90,15 @@ class externalParser:
                     ',30003058,30005334,30002506,30003931,30005255,30004263,30000062,30002241,30003558'
                     ',30001376,30004257,30004108,30000048,30003482,30005263,30005066,30004268,30005236'
                     ',30003829,30005034,30003074,30003809,30001718,30004256,30004301,30002397,30003854'
-                    ',30001660)') 
-        
-        #Adding Final Liminality Systems
+                    ',30001660)')
+
+        # Adding Final Liminality Systems
         cur.execute('UPDATE mapSolarSystems SET trigStatusID=2 WHERE solarSystemID IN (30002079,30002652'
                     ',30002411,30005005,30000021,30002797,30031392,30001413,30000206,30040141,30045328'
                     ',30002770,30003504,30002737,30000192,30000157,30001372,30002702,30003046,30020141'
-                    ',30045329,30002225,30001381,30001445,30010141,30005029,30003495)') 
+                    ',30045329,30002225,30001381,30001445,30010141,30005029,30003495)')
 
-        #Adding Fortress Systems
+        # Adding Fortress Systems
         cur.execute('UPDATE mapSolarSystems SET trigStatusID=3 WHERE solarSystemID IN (30003539,30003573'
                     ',30005251,30004103,30000118,30004090,30003548,30000113,30002386,30004973,30002266'
                     ',30002530,30004141,30002253,30003398,30003490,30003556,30002385,30002704,30005058'
@@ -105,13 +107,13 @@ class externalParser:
                     ',30003515,30004100,30002662,30045322,30003885,30004248,30003541,30002651,30004150'
                     ',30002251,30005260,30000105,30004992,30002243,30003553)')
 
-        #Adding Triglavian Minor Victory Systems
+        # Adding Triglavian Minor Victory Systems
         cur.execute('UPDATE mapSolarSystems SET trigStatusID=4 WHERE solarSystemID IN (30045331,30001400'
                     ',30004244,30045345,30001358,30001401,30045354,30002557,30002760,30002795,30004981'
                     ',30001447,30001390,30003076,30000163,30003073,30001391,30002771,30005330,30000205'
                     ',30003856,30002645,30045338,30002575,30001383,30003464,30000182,30001685)')
 
-        #updating Jove Systems Part 1
+        # updating Jove Systems Part 1
         print("SMT: Adding Jove Systems")
         cur.execute('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ("0-4VQL"'
                     ',"0-ARFO","0-G8NO","0-U2M4","0-VG7A","0-WVQS","0-XIDJ","01TG-J","08S-39","0D-CHA"'
@@ -158,8 +160,8 @@ class externalParser:
                     ',"Eygfe","Eystur","F-749O","F-9PXR","F-TQWO","F-UVBV","F-ZBO0","F2-NXA","F3-8X2"'
                     ',"F39H-1","F4R2-Q","F5-CGW","F5FO-U","F69O-M","F9E-KX","Fabin","Fanathor","Faspera"'
                     ',"Faswiba","FD-MLJ","FDZ4-A","FE-6YQ","Fihrneh","Fildar","Firbha","Fluekele","Fovihi")')
-        
-        #updating Jove Systems Part 2
+
+        # updating Jove Systems Part 2
         cur.execute('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ("Frarn"'
                     ',"FRTC-5","FS-RFL","FSW-3C","FV-SE8","FV-YEA","FV1-RQ","FYD-TO","G-4H4C","G-AOTH"'
                     ',"G-G78S","G-ME2K","G-UTHL","G-YZUX","G2-INZ","G8AD-C","G9L-LP","Galeh","Gallareue"'
@@ -196,7 +198,7 @@ class externalParser:
                     ',"NBW-GD","NE-3GR","Nedegulf","NEH-CS","Nema","New Eden","NG-M8K","Nidebora","Nifshed"'
                     ',"Nimambal","Nisuwa","NIZJ-0","NJ4X-S","Nomaa","Nomash","Nouta","NS2L-4","NSBE-L")')
 
-        #updating Jove Systems Part 3
+        # updating Jove Systems Part 3
         cur.execute('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ("NSI-MW"'
                     ',"Nuken","NZW-ZO","O-7LAI","O-CT8N","O-IVNH","O-JPKH","O-LR1H","O-MCZR","O-N589"'
                     ',"O-QKSM","O1Y-ED","O2O-2X","O3L-95","O7-7UX","Obanen","Oberen","Obrolber","Odin"'
@@ -241,12 +243,21 @@ class externalParser:
 
         cur.close()
 
+    def _importCSV(self, path, id=0):
+        """reads a CSV file and parse the identifiers to return it a process it"""
+        result = []
+        with open(path) as file:
+            csv_reader = csv.reader(file)
+            for fields in csv_reader:
+                result.append(fields[id])
+        return result
+
     def _iterateList(self, array):
         for value in array:
             yield (value,)
 
     def _extractMapData(self, mapFileName):
-        """Function that serach all the icebetls and abstract coordinates 
+        """Function that serach all the icebetls and abstract coordinates
         in the dotlan maps and updates its status in Database"""
         eTree = xml.etree.ElementTree.ElementTree()
         root = eTree.parse(source=mapFileName)
@@ -261,9 +272,9 @@ class externalParser:
         if len(solarSystemIds) > 0:
             query = "UPDATE mapSolarSystems SET iceBelt=1 WHERE solarSystemID IN (?)"
             cur = self._dbDriver.connection.cursor()
-            cur.executemany(query,self._iterateList(solarSystemIds))
+            cur.executemany(query, self._iterateList(solarSystemIds))
             cur.close()
-        
+
         solarSystemIds.clear()
         """ here we retrieving all the coordionates from the Regional maps """
         tags = root.findall(".//{http://www.w3.org/2000/svg}use")
@@ -273,7 +284,7 @@ class externalParser:
             tagID = tag.attrib.get('id')[3::]
             solarSystemIds = {"id": tagID, "regionId": regionId, "X": tag.attrib.get('x'), "Y": tag.attrib.get('y')}
             query = "INSERT INTO mapAbstractSystems (solarSystemId,regionId,x,y) VALUES (:id,:regionId,:X,:Y);"
-            cur.execute(query,solarSystemIds)
+            cur.execute(query, solarSystemIds)
         cur.close()
         self._dbDriver.connection.commit()
 
@@ -281,24 +292,54 @@ class externalParser:
         """Function to get all regions from SDE and download the svg maps from dotlan"""
         cur = self._dbDriver.connection.cursor()
         try:
-            cur.execute("SELECT regionId, regionName FROM mapRegions WHERE regionId < :regionId ;",{"regionId": 11000000})
+            cur.execute("SELECT regionId, regionName FROM mapRegions WHERE regionId < :regionId ;", {"regionId": 11000000})
             rows = cur.fetchall()
-        except:
+        except DatabaseError:
             print("Dotlan: Error ... ")
         cur.close()
         return rows
 
+    def _importIceBelts(self):
+        cur = self._dbDriver.connection.cursor()
+        query = 'UPDATE mapSolarSystems SET iceBelt=1 WHERE solarSystemID IN (?)'
+        data = self._importCSV(Path('CSV').joinpath('iceBelts.csv'))
+        for row in data:
+            pass
+        cur.execute(query)
+        cur.close()
+
+    def _importJoveObservatory(self):
+        cur = self._dbDriver.connection.cursor()
+        query = 'UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemID IN (?)'
+        data = self._importCSV(Path('CSV').joinpath('joveObservatory.csv'))
+        for row in data:
+            pass
+        cur.execute(query)
+        cur.close()
+
+    def _importTriglavianInvansion(self):
+        cur = self._dbDriver.connection.cursor()
+        query = 'UPDATE mapSolarSystems SET trigStatusID=1 WHERE solarSystemID IN (?)'
+        data = self._importCSV(Path('CSV').joinpath('trigStatusId.csv'))
+        for row in data:
+            pass
+        cur.execute(query)
+        cur.close()
+
     def process(self):
         """ Retrieving all Regions from Dotlan to parse the SVG data """
         self._updateTables()
+        self._importIceBelts()
+        self._importJoveObservatory()
+        self._importTriglavianInvansion()
         eveRegions = self.getAllRegions()
         for region in eveRegions:
             fileSize = 0
             mapFilePath = Path(self.dataDirectory).joinpath(str(region[0]) + '.svg')
             if not mapFilePath.exists():
-                mapUrl = self.mapUrl + region[1].replace(' ','_') + ".svg"
+                mapUrl = self.mapUrl + region[1].replace(' ', '_') + ".svg"
                 urlparse(mapUrl)
-                fileSize = miscUtils.downloadFile(mapUrl,"maps/" + str(region[0]) + ".svg")
+                fileSize = miscUtils.downloadFile(mapUrl, "maps/" + str(region[0]) + ".svg")
                 if fileSize <= 100:
                     mapFilePath.unlink()
                     print("Dotlan: Invalid data was recieved for " + region[1])
@@ -306,4 +347,3 @@ class externalParser:
                     print("Dotlan: Downloaded Map for " + region[1])
             print("Dotlan: parsing data for " + region[1])
             self._extractMapData(mapFilePath)
-    
