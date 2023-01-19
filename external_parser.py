@@ -1,11 +1,11 @@
 # -*- coding: UTF-8 -*-
 from sqlite3 import DatabaseError
-from databaseDriver import DatabaseDriver, DatabaseType
 import xml.etree.ElementTree
 from pathlib import Path
-from miscUtils import miscUtils
 from urllib.parse import urlparse
 import csv
+from misc_utils import miscUtils
+from database_driver import DatabaseDriver, DatabaseType
 
 
 class externalParser:
@@ -36,12 +36,12 @@ class externalParser:
     def mapUrl(self, value):
         self._mapUrl = value
 
-    def __init__(self, directory, databaseFile, type=DatabaseType.SQLITE):
-        if type == DatabaseType.SQLITE:
+    def __init__(self, directory, databaseFile, db_type=DatabaseType.SQLITE):
+        if db_type == DatabaseType.SQLITE:
             self.dataDirectory = directory
             print("Misc: Using SQLite as Database Engine...")
-        self._dbDriver = DatabaseDriver(type, databaseFile)
-        self._dbType = type
+        self._dbDriver = DatabaseDriver(db_type, databaseFile)
+        self._dbType = db_type
 
     def _updateTables(self):
         cur = self._dbDriver.connection.cursor()
@@ -243,13 +243,13 @@ class externalParser:
 
         cur.close()
 
-    def _importCSV(self, path, id=0):
+    def _importCSV(self, path, value_id=0):
         """reads a CSV file and parse the identifiers to return it a process it"""
         result = []
-        with open(path) as file:
+        with open(path, 'rt', encoding='UTF-8') as file:
             csv_reader = csv.reader(file)
             for fields in csv_reader:
-                result.append(fields[id])
+                result.append(fields[value_id])
         return result
 
     def _iterateList(self, array):
@@ -291,6 +291,7 @@ class externalParser:
     def getAllRegions(self):
         """Function to get all regions from SDE and download the svg maps from dotlan"""
         cur = self._dbDriver.connection.cursor()
+        rows = None
         try:
             cur.execute("SELECT regionId, regionName FROM mapRegions WHERE regionId < :regionId ;", {"regionId": 11000000})
             rows = cur.fetchall()
@@ -332,8 +333,8 @@ class externalParser:
         self._importIceBelts()
         self._importJoveObservatory()
         self._importTriglavianInvansion()
-        eveRegions = self.getAllRegions()
-        for region in eveRegions:
+        eve_regions = self.getAllRegions()
+        for region in eve_regions:
             fileSize = 0
             mapFilePath = Path(self.dataDirectory).joinpath(str(region[0]) + '.svg')
             if not mapFilePath.exists():

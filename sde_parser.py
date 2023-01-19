@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """ This script provides a Class to parse SDE structure into a SQLite Database"""
-from databaseDriver import DatabaseDriver, DatabaseType
-import yaml
 from pathlib import Path
+import yaml
+from database_driver import DatabaseDriver, DatabaseType
 
-
-class sdeConfig:
+class SdeConfig:
+    """
+    Provides default configuration for importing data from SDE
+    """
     extendedCoordinates = True
     mapKSpace = True
     mapWSpace = True
@@ -21,11 +23,11 @@ class DirectoryNotFoundError(Exception):
     pass
 
 
-class sdeParser:
+class SdeParser:
     # Propiedades
-    _yamlDirectory = None
-    _dbDriver = None
-    _dbType = None
+    _yaml_directory = None
+    _db_driver = None
+    _db_type = None
     _config = None
     # this counter permits to detect what item we are iterating now
     _counter = -1
@@ -37,45 +39,45 @@ class sdeParser:
         return self._config
 
     @property
-    def yamlDirectory(self):
+    def yaml_directory(self):
         """the database file name"""
-        return self._yamlDirectory
+        return self._yaml_directory
 
-    @yamlDirectory.setter
-    def yamlDirectory(self, filename):
-        self._yamlDirectory = filename
+    @yaml_directory.setter
+    def yaml_directory(self, filename):
+        self._yaml_directory = filename
 
     # Constructor
-    def __init__(self, directory, databaseFile, type=DatabaseType.SQLITE):
+    def __init__(self, directory, database_file, type=DatabaseType.SQLITE):
         if Path(directory).is_dir():
-            self.yamlDirectory = directory
+            self.yaml_directory = directory
         else:
             raise(DirectoryNotFoundError('The specified directory does not exists.'))
         if type == DatabaseType.SQLITE:
             print("SDE: Using SQLite as Database Engine...")
-        self._dbDriver = DatabaseDriver(type, databaseFile)
-        self._dbType = type
-        self._config = sdeConfig()
+        self._db_driver = DatabaseDriver(type, database_file)
+        self._db_type = type
+        self._config = SdeConfig()
 
-    def _readDirectory(self, directoryPath):
-        for element in directoryPath.iterdir():
+    def _read_directory(self, directory_path):
+        for element in directory_path.iterdir():
             if element.is_dir():
                 self._counter += 1
                 if self._counter == 0:
-                    self._parseRegion(element.joinpath('region.staticdata'))
+                    self._parse_region(element.joinpath('region.staticdata'))
                 if self._counter == 1:
-                    self._parseConstellation(element.joinpath('constellation.staticdata'))
-                self._readDirectory(element)
+                    self._parse_constellation(element.joinpath('constellation.staticdata'))
+                self._read_directory(element)
                 self._counter -= 1
             if element.is_file() and element.name == "solarsystem.staticdata":
-                self._parseSolarSystem(element)
+                self._parse_solar_system(element)
 
     # Not used for now
     def spinner(self, value, lenght=3, width=7, message=None):
         print('[', end='')
-        calculatedValue = (value % lenght)
+        calculated_value = (value % lenght)
         for x in range(0, width):
-            if x >= calculatedValue or x < calculatedValue - lenght:
+            if x >= calculated_value or x < calculated_value - lenght:
                 print('▉', end='')
             else:
                 print(' ', end='')
@@ -84,9 +86,9 @@ class sdeParser:
         else:
             print(']')
 
-    def createTableStructure(self):
-        if self._dbType == DatabaseType.SQLITE:
-            cur = self._dbDriver.connection.cursor()
+    def create_table_structure(self):
+        if self._db_type == DatabaseType.SQLITE:
+            cur = self._db_driver.connection.cursor()
             query = 'CREATE TABLE invNames (itemId INT NOT NULL PRIMARY KEY, itemName TEXT NOT NULL);'
             cur.execute(query)
 
@@ -249,33 +251,33 @@ class sdeParser:
             query = 'CREATE UNIQUE INDEX moonId ON mapMoons(moonId);'
             cur.execute(query)
 
-            self._dbDriver.connection.commit()
+            self._db_driver.connection.commit()
             cur.close()
             print("SDE: Tables created from scratch...")
 
-    def parseData(self):
-        self._parseNames()
-        self._parseCategories(Path(self._yamlDirectory).joinpath('fsd', 'categoryIDs.yaml'))
-        self._parseGroups(Path(self._yamlDirectory).joinpath('fsd', 'groupIDs.yaml'))
-        self._parseTypes(Path(self._yamlDirectory).joinpath('fsd', 'typeIDs.yaml'))
-        universeDirectory = Path(self._yamlDirectory).joinpath('fsd', 'universe')
+    def parse_data(self):
+        self._parse_names()
+        self._parse_categories(Path(self._yaml_directory).joinpath('fsd', 'categoryIDs.yaml'))
+        self._parse_groups(Path(self._yaml_directory).joinpath('fsd', 'groupIDs.yaml'))
+        self._parse_types(Path(self._yaml_directory).joinpath('fsd', 'typeIDs.yaml'))
+        universe_dir = Path(self._yaml_directory).joinpath('fsd', 'universe')
         if self._config.mapKSpace:
             print('SDE: parsing High,Low and Nullsec Systems')
-            self._readDirectory(universeDirectory.joinpath('eve'))
+            self._read_directory(universe_dir.joinpath('eve'))
         if self._config.mapWSpace:
             print('SDE: parsing Wormhole Systems')
-            self._readDirectory(universeDirectory.joinpath('wormhole'))
+            self._read_directory(universe_dir.joinpath('wormhole'))
         if self._config.mapAbbysal:
             print('SDE: parsing Abyssal Systems')
-            self._readDirectory(universeDirectory.joinpath('abyssal'))
+            self._read_directory(universe_dir.joinpath('abyssal'))
         if self._config.mapVoid:
             print('SDE: parsing Void Systems')
-            self._readDirectory(universeDirectory.joinpath('void'))
+            self._read_directory(universe_dir.joinpath('void'))
 
-    def _parseTypes(self, pathObject):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_types(self, path_object):
+        cur = self._db_driver.connection.cursor()
         query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId, published, volume) VALUES (:id ,:groupId, :name, :iconId, :published, :volume)')
-        with pathObject.open() as file:
+        with path_object.open(encoding='UTF-8') as file:
             yTypes = yaml.safe_load(file)
             total = len(yTypes)
             cont = 0
@@ -297,9 +299,9 @@ class sdeParser:
             print(f'SDE: {total} Types parsed           ')
         cur.close()
 
-    def _parseGroups(self, pathObject):
-        cur = self._dbDriver.connection.cursor()
-        with pathObject.open() as file:
+    def _parse_groups(self, path_object):
+        cur = self._db_driver.connection.cursor()
+        with path_object.open(encoding='UTF-8') as file:
             yGroups = yaml.safe_load(file)
             total = len(yGroups)
             cont = 0
@@ -316,9 +318,9 @@ class sdeParser:
             print(f'SDE: {total} Groups parsed            ')
         cur.close()
 
-    def _parseCategories(self, pathObject):
-        cur = self._dbDriver.connection.cursor()
-        with pathObject.open() as file:
+    def _parse_categories(self, path_object):
+        cur = self._db_driver.connection.cursor()
+        with path_object.open(encoding='UTF-8') as file:
             yCategories = yaml.safe_load(file)
             total = len(yCategories)
             cont = 0
@@ -334,8 +336,8 @@ class sdeParser:
             print(f'SDE: {total} Categories parsed          ')
         cur.close()
 
-    def _parseSolarSystem(self, pathObject):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_solar_system(self, path_object):
+        cur = self._db_driver.connection.cursor()
         params = {}
 
         # query creation
@@ -350,12 +352,12 @@ class sdeParser:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ '
         query += ');'
 
-        with pathObject.open() as file:
+        with path_object.open(encoding='UTF-8') as file:
             element = yaml.safe_load(file)
 
             # set the solar system Id
             self._Location[self._counter]['id'] = element['solarSystemID']
-            self._Location[self._counter]['name'] = self._getName(element['solarSystemID'])
+            self._Location[self._counter]['name'] = self._get_name(element['solarSystemID'])
             print('SDE: parsing data for system ' + self._Location[self._counter]["name"])
 
             params['id'] = element['solarSystemID']
@@ -384,13 +386,13 @@ class sdeParser:
                 params['securityClass'] = element['securityClass']
             cur.execute(query, params)
 
-            self._parseGates(element['stargates'])
-            self._parsePlanets(element['planets'])
-            self._parseStar(element['star'])
+            self._parse_gates(element['stargates'])
+            self._parse_planets(element['planets'])
+            self._parse_star(element['star'])
         cur.close()
 
-    def _parseConstellation(self, pathObject):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_constellation(self, path_object):
+        cur = self._db_driver.connection.cursor()
         # query creation
         query = ('INSERT INTO mapConstellations (constellationId ,constellationName ,regionId ,radius '
                  ',centerX ,centerY ,centerZ ')
@@ -400,11 +402,11 @@ class sdeParser:
         if self._config.extendedCoordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ'
         query += ')'
-        with pathObject.open() as file:
+        with path_object.open(encoding='UTF-8') as file:
             element = yaml.safe_load(file)
 
             self._Location[self._counter]["id"] = element['constellationID']
-            self._Location[self._counter]["name"] = self._getName(element['constellationID'])
+            self._Location[self._counter]["name"] = self._get_name(element['constellationID'])
 
             print('SDE: parsing data for constellation ' + self._Location[self._counter]["name"])
             params = {}
@@ -425,8 +427,8 @@ class sdeParser:
             cur.execute(query, params)
         cur.close()
 
-    def _parseRegion(self, pathObject):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_region(self, path_object):
+        cur = self._db_driver.connection.cursor()
         # query creation
         query = ('INSERT INTO mapRegions(regionId, regionName, factionId, centerX, centerY, centerZ'
                  ',nebula ,wormholeClassId ')
@@ -437,10 +439,10 @@ class sdeParser:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ'
         query += ')'
 
-        with pathObject.open() as file:
+        with path_object.open(encoding='UTF-8') as file:
             region = yaml.safe_load(file)
             self._Location[self._counter]["id"] = region['regionID']
-            self._Location[self._counter]["name"] = self._getName(region['regionID'])
+            self._Location[self._counter]["name"] = self._get_name(region['regionID'])
 
             print('SDE: parsing data for region ' + self._Location[self._counter]["name"])
             params = {}
@@ -466,8 +468,8 @@ class sdeParser:
             cur.execute(query, params)
         cur.close()
 
-    def _parseGates(self, node):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_gates(self, node):
+        cur = self._db_driver.connection.cursor()
         query = ('INSERT INTO mapSystemGates (systemGateId, solarSystemId, typeId, positionX, positionY, positionZ)'
                  ' VALUES (:id, :solarSystemId, :typeId, :posX, :posY, :posZ );')
         for element in node.items():
@@ -481,8 +483,8 @@ class sdeParser:
             cur.execute(query, params)
         cur.close()
 
-    def _parseMoons(self, node):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_moons(self, node):
+        cur = self._db_driver.connection.cursor()
         cont = 1
         query = ('INSERT INTO mapMoons (moonId, solarSystemId, moonIndex, typeid, radius, positionX, '
                  'positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, :typeId, :radius, :posX, '
@@ -503,8 +505,8 @@ class sdeParser:
             cont += 1
         cur.close()
 
-    def _parsePlanets(self, node):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_planets(self, node):
+        cur = self._db_driver.connection.cursor()
         query = ('INSERT INTO mapPlanets (planetId, solarSystemId, planetaryIndex, fragmented, radius, locked, typeId,'
                  'positionX, positionY, positionZ) VALUES (:id, :solarSystemId, :planetIndex, :fragmented, :radius, '
                  ':locked, :typeId, :posX, :posY, :posZ );')
@@ -522,12 +524,12 @@ class sdeParser:
             params['posZ'] = element[1]['position'][2]
             cur.execute(query, params)
             if 'moons' in element[1]:
-                self._parseMoons(element[1]['moons'])
+                self._parse_moons(element[1]['moons'])
         cur.close()
 
-    def _parseStar(self, node):
+    def _parse_star(self, node):
         params = {}
-        cur = self._dbDriver.connection.cursor()
+        cur = self._db_driver.connection.cursor()
         query = ('INSERT INTO mapStars ( starId, solarSystemId, locked, radius, typeId ) VALUES '
                  '(:starId, :solarSystemId, :locked, :radius, :typeId)')
         params['starId'] = node['id']
@@ -538,14 +540,14 @@ class sdeParser:
         cur.execute(query, params)
         cur.close()
 
-    def _parseNames(self):
-        cur = self._dbDriver.connection.cursor()
+    def _parse_names(self):
+        cur = self._db_driver.connection.cursor()
         """Load the all the names used by entities and dump it into a temp table"""
-        namesFile = Path(self.yamlDirectory).joinpath('bsd', 'invNames.yaml')
-        if not namesFile.exists():
-            raise(FileNotFoundError)
+        names_file = Path(self.yaml_directory).joinpath('bsd', 'invNames.yaml')
+        if not names_file.exists():
+            raise FileNotFoundError
         query = 'INSERT INTO invNames (itemId, itemName) VALUES (:id, :name);'
-        with namesFile.open() as file:
+        with names_file.open(encoding='UTF-8') as file:
             names = yaml.safe_load(file)
 
         total = len(names)
@@ -560,9 +562,9 @@ class sdeParser:
         cur.close()
         print(f'SDE: {total} names parsed                  ')
 
-    def _getName(self, id):
+    def _get_name(self, id):
         result = ''
-        cur = self._dbDriver.connection.cursor()
+        cur = self._db_driver.connection.cursor()
         query = 'SELECT itemName FROM invNames WHERE itemId = ?;'
         rows = cur.execute(query, (id,))
         for row in rows:
@@ -573,14 +575,14 @@ class sdeParser:
     def close(self):
         """Drop unnecesary data, commit transactions and close the database"""
         query = 'DROP TABLE invNames;'
-        cur = self._dbDriver.connection.cursor()
+        cur = self._db_driver.connection.cursor()
         cur.execute(query)
-        self._dbDriver.connection.commit()
-        if self._dbType == DatabaseType.SQLITE:
+        self._db_driver.connection.commit()
+        if self._db_type == DatabaseType.SQLITE:
             query = 'VACUUM;'
             cur.execute(query)
         cur.close()
 
     @classmethod
-    def fromFuzzworks(cls, databaseUrl):
-        raise(NotImplementedError)
+    def from_fuzzworks(cls, database_url):
+        raise NotImplementedError

@@ -1,37 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
-"""This script download the EVE online's Tranquility Server Database and discard all the non-escential data """
+"""
+This script download the EVE online's Tranquility Server
+Database and discard all the non-escential data
+"""
 from pathlib import Path
 import shutil
-from externalParser import externalParser
-from sdeParser import sdeParser
-from miscUtils import miscUtils
+from external_parser import externalParser
+from sde_parser import SdeParser
+from misc_utils import miscUtils
 
-fuzzDbUrl = 'https://www.fuzzwork.co.uk/dump/'
-sdeUrl = 'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/'
-mapsURL = 'http://evemaps.dotlan.net/svg/'
-fuzzDbName = 'sqlite-latest.sqlite.bz2'
-sdeFileName = 'sde.zip'
-sdeChecksum = 'checksum'
-outFileName = 'smt.db'
+FUZZ_DB_URL = 'https://www.fuzzwork.co.uk/dump/'
+SDE_URL = 'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/'
+MAPS_URL = 'http://evemaps.dotlan.net/svg/'
+FUZZ_DB_NAME = 'sqlite-latest.sqlite.bz2'
+SDE_FILENAME = 'sde.zip'
+SDE_CHECKSUM = 'checksum'
+OUT_FILENAME = 'smt.db'
 miscUtils.chunkSize = 2391975
 updateDetected = False
 fromFuzzWorks = False
 
 source = []
 if fromFuzzWorks:
-    source.append(Path('.').joinpath(fuzzDbName + '.md5'))
-    source.append(Path('.').joinpath(fuzzDbName + '.md5.old'))
-    source.append(fuzzDbUrl + fuzzDbName + '.md5')
-    source.append(fuzzDbUrl + fuzzDbName)
-    source.append(Path('.').joinpath(fuzzDbName))
+    source.append(Path('.').joinpath(FUZZ_DB_NAME + '.md5'))
+    source.append(Path('.').joinpath(FUZZ_DB_NAME + '.md5.old'))
+    source.append(FUZZ_DB_URL + FUZZ_DB_NAME + '.md5')
+    source.append(FUZZ_DB_URL + FUZZ_DB_NAME)
+    source.append(Path('.').joinpath(FUZZ_DB_NAME))
 else:
     source.append(Path('.').joinpath('checksum'))
     source.append(Path('.').joinpath('sde.md5'))
-    source.append(sdeUrl + sdeChecksum)
-    source.append(sdeUrl + sdeFileName)
-    source.append(Path('.').joinpath(sdeFileName))
-source.append(Path('.').joinpath(outFileName))
+    source.append(SDE_URL + SDE_CHECKSUM)
+    source.append(SDE_URL + SDE_FILENAME)
+    source.append(Path('.').joinpath(SDE_FILENAME))
+source.append(Path('.').joinpath(OUT_FILENAME))
 
 """ Download the MD5 Checksum """
 miscUtils.downloadFile(source[2])
@@ -39,8 +42,8 @@ miscUtils.downloadFile(source[2])
 """ this chunk of code detects if a new File exists """
 if Path(source[1]).exists():
     md5File = []
-    md5File.append(open(source[0], 'rt'))
-    md5File.append(open(source[1], 'rt'))
+    md5File.append(open(source[0], 'rt', encoding='UTF-8'))
+    md5File.append(open(source[1], 'rt', encoding='UTF-8'))
     if md5File[0].read() != md5File[1].read():
         updateDetected = True
     md5File[0].close()
@@ -74,20 +77,19 @@ if source[5].exists():
 
 # decompressing the database
 if fromFuzzWorks:
-    # TODO
-    pass
+    raise NotImplementedError
 else:
     miscUtils.zipDecompress(source[4], Path('.'))
-    processor = sdeParser(Path('.').joinpath('sde'), source[5])
+    processor = SdeParser(Path('.').joinpath('sde'), source[5])
     processor.configuration.extendedCoordinates = False
     processor.configuration.mapAbbysal = False
     processor.configuration.mapKSpace = True
     processor.configuration.mapVoid = False
     processor.configuration.mapWSpace = False
-    processor.createTableStructure()
-    processor.parseData()
+    processor.create_table_structure()
+    processor.parse_data()
     processor.close()
 
 if processor is not None:
-    eParser = externalParser(Path('.').joinpath('maps'), Path(outFileName))
+    eParser = externalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
     eParser.process()
