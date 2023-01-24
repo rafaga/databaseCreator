@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 from database_driver import DatabaseDriver, DatabaseType
 
+
 class SdeConfig:
     """
     Provides default configuration for importing data from SDE
@@ -15,19 +16,16 @@ class SdeConfig:
     map_abbysal = True
     map_void = False
 
-    # Optional Flags - This data don't belong to SDE it's populated by community
-    with_icebelts = False
-    with_triglavian_status = False
-    with_special_ore = False
-
     # TODO: implement these flags, these flags depend upon map Flags.
-    map_moons = True
-    map_gates = True
+    with_moons = True
+    with_gates = True
     with_star_catalog = True
 
 
-
 class DirectoryNotFoundError(Exception):
+    """
+    Generic class for Directory Not foun error
+    """
     pass
 
 
@@ -60,7 +58,7 @@ class SdeParser:
         if Path(directory).is_dir():
             self.yaml_directory = directory
         else:
-            raise(DirectoryNotFoundError('The specified directory does not exists.'))
+            raise DirectoryNotFoundError('The specified directory does not exists.')
         if db_type == DatabaseType.SQLITE:
             print("SDE: Using SQLite as Database Engine...")
         self._db_driver = DatabaseDriver(db_type, database_file)
@@ -202,7 +200,7 @@ class SdeParser:
                      ' ON UPDATE CASCADE ON DELETE SET NULL'
                      ',factionId INT REFERENCES factions(factionId) ON UPDATE CASCADE'
                      ' ON DELETE SET NULL'
-                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId,factionId) ON CONFLICT FAIL'
+                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId,factionId)'
                      ');')
             cur.execute(query)
 
@@ -212,48 +210,61 @@ class SdeParser:
 
             # Gates - SQLite (typeId here)
             query = ('CREATE TABLE mapSystemGates (systemGateId INT NOT NULL '
-                     ',solarSystemID INT NOT NULL REFERENCES mapSolarSystems(solarSystemId) '
-                     'ON UPDATE CASCADE ON DELETE SET NULL ,typeId INT NOT NULL '
-                     'REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
-                     ',positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL '
-                     ',positionZ FLOAT NOT NULL ,CONSTRAINT pkey PRIMARY KEY '
-                     '(systemGateId,solarSystemID) ON CONFLICT FAIL );')
+                     ',solarSystemID INT NOT NULL REFERENCES mapSolarSystems '
+                     '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
+                     'typeId INT NOT NULL REFERENCES invTypes(typeId) ON '
+                     'UPDATE CASCADE ON DELETE SET NULL ,positionX FLOAT '
+                     'NOT NULL ,positionY FLOAT NOT NULL ,positionZ FLOAT '
+                     'NOT NULL ,CONSTRAINT pkey PRIMARY '
+                     'KEY (systemGateId,solarSystemID) ON CONFLICT FAIL );')
             cur.execute(query)
 
             # Planets - SQLite (typeId here)
-            query = ('CREATE TABLE mapPlanets (planetId INT NOT NULL PRIMARY KEY'
-                     ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) '
-                     'ON UPDATE CASCADE ON DELETE SET NULL '
-                     ',planetaryIndex INT NOT NULL, fragmented BOOL NOT NULL '
-                     ',radius FLOAT NOT NULL, locked BOOL NOT NULL '
-                     ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE '
-                     'ON DELETE SET NULL ,positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL '
-                     ',positionZ FLOAT NOT NULL '
+            query = ('CREATE TABLE mapPlanets (planetId INT NOT NULL '
+                     'PRIMARY KEY,solarSystemId INTEGER REFERENCES '
+                     'mapSolarSystems(solarSystemId) ON UPDATE '
+                     'CASCADE ON DELETE SET NULL,planetaryIndex INTEGER '
+                     'NOT NULL, fragmented BOOL NOT NULL ,radius FLOAT '
+                     'NOT NULL, locked BOOL NOT NULL ,typeId INT NOT '
+                     'NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE '
+                     'ON DELETE SET NULL ,positionX FLOAT NOT NULL, '
+                     'positionY FLOAT NOT NULL, positionZ FLOAT NOT NULL '
                      ');')
             cur.execute(query)
 
-            query = 'CREATE UNIQUE INDEX planetSystem ON mapPlanets(solarSystemId, planetaryIndex);'
+            query = ('CREATE UNIQUE INDEX planetSystem ON mapPlanets'
+                     '(solarSystemId, planetaryIndex);')
             cur.execute(query)
 
+            # Star Type - SQLite
+            query = ('CREATE TABLE starTypes (starTypeId INTEGER NOT NULL'
+                     'PRIMARY KEY )')
+
             # Stars - SQLite (typeId Here)
-            query = ('CREATE TABLE mapStars (starId INT NOT NULL PRIMARY KEY ,solarSystemId INT '
-                     'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL '
-                     ',locked BOOL NOT NULL ,radius INT NOT NULL '
-                     ',typeId INT NOT NULL REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
+            query = ('CREATE TABLE mapStars (starId INT NOT NULL PRIMARY KEY '
+                     ',solarSystemId INTEGER REFERENCES mapSolarSystems'
+                     '(solarSystemId) ON UPDATE CASCADE ON DELETE RESTRICT '
+                     ',locked BOOL NOT NULL ,radius INTEGER NOT NULL, '
+                     'typeId INT NOT NULL REFERENCES invTypes(typeId) '
+                     'ON UPDATE CASCADE ON DELETE SET NULL '
                      ');')
             cur.execute(query)
 
             # star index
-            query = 'CREATE UNIQUE INDEX starId ON mapStars (solarSystemId, starId);'
+            query = ('CREATE UNIQUE INDEX starId ON mapStars '
+                     '(solarSystemId, starId);')
             cur.execute(query)
 
             # Moons - SQLite
-            query = ('CREATE TABLE mapMoons (moonId INT NOT NULL ,solarSystemId INT '
-                     'REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
-                     'moonIndex INT NOT NULL, positionX FLOAT NOT NULL ,positionY FLOAT NOT NULL , '
-                     'positionZ FLOAT NOT NULL, radius INT,'
-                     'typeId INT REFERENCES invTypes(typeId) ON UPDATE CASCADE ON DELETE SET NULL '
-                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, moonId) ON CONFLICT FAIL '
+            query = ('CREATE TABLE mapMoons (moonId INT NOT NULL '
+                     ',solarSystemId INTEGER REFERENCES mapSolarSystems'
+                     '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
+                     'moonIndex INTEGER NOT NULL, positionX FLOAT NOT NULL, '
+                     'positionY FLOAT NOT NULL, positionZ FLOAT NOT NULL, '
+                     'radius INTEGER, '
+                     'typeId INT REFERENCES invTypes(typeId) ON UPDATE CASCADE '
+                     'ON DELETE SET NULL ,CONSTRAINT pkey PRIMARY KEY '
+                     '(solarSystemId, moonId) ON CONFLICT FAIL '
                      ');')
             cur.execute(query)
 
@@ -266,20 +277,28 @@ class SdeParser:
             # Corporation/Station - SQLite
             # ',stationId INT REFERENCES stations(stationId) ON UPDATE CASCADE ON DELETE SET NULL'
             query = ('CREATE TABLE staCorporations ('
-                     ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
-                     ',corporationId INT REFERENCES npcCorporations(corporationId) ON UPDATE CASCADE ON DELETE SET NULL'
-                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId, corporationId) ON CONFLICT FAIL '
+                     'solarSystemId INT REFERENCES mapSolarSystems'
+                     '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ',corporationId INT REFERENCES npcCorporations'
+                     '(corporationId) ON UPDATE CASCADE ON DELETE SET NULL'
+                     ',CONSTRAINT pkey PRIMARY KEY (solarSystemId,'
+                     'corporationId) ON CONFLICT FAIL '
                      ');')
+            cur.execute(query)
 
             # star index
             query = 'CREATE UNIQUE INDEX moonId ON mapMoons(moonId);'
             cur.execute(query)
 
-            self._db_driver.connection.commit()
+            cur.connection.commit()
             cur.close()
             print("SDE: Tables created from scratch...")
 
     def parse_data(self):
+        """
+        This method provides centralized point to parse all data 
+        and put it into tables
+        """
         self._parse_names()
         self._parse_categories(Path(self._yaml_directory).joinpath('fsd', 'categoryIDs.yaml'))
         self._parse_groups(Path(self._yaml_directory).joinpath('fsd', 'groupIDs.yaml'))
@@ -300,25 +319,34 @@ class SdeParser:
 
     def _parse_types(self, path_object):
         cur = self._db_driver.connection.cursor()
+        process = {}
+        query = ('SELECT groupId, groupName FROM invGroups WHERE groupName IN (?);')
+        result = cur.execute(query,['sun'])
+        rows = result.fetchall()
+        for row in rows:
+            process[row[0]]=row[1]
         query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId, published, volume) VALUES (:id ,:groupId, :name, :iconId, :published, :volume)')
         with path_object.open(encoding='UTF-8') as file:
-            yTypes = yaml.safe_load(file)
-            total = len(yTypes)
+            yaml_types = yaml.safe_load(file)
+            total = len(yaml_types)
             cont = 0
-            for type in yTypes.items():
-                params = {}
-                params['id'] = type[0]
-                params['name'] = type[1]['name']['en']
-                params['groupId'] = type[1]["groupID"]
-                params['iconId'] = None
-                if 'iconID' in type[1]:
-                    params['iconId'] = type[1]["iconID"]
-                params['published'] = type[1]["published"]
-                params['volume'] = None
-                if 'volume' in type[1]:
-                    params['volume'] = type[1]["volume"]
-                cur.execute(query, params)
-                cont += 1
+            for object_type in yaml_types.items():
+                if process.get(object_type[1]["groupID"]) is not None:
+                    pass
+                else:
+                    params = {}
+                    params['id'] = object_type[0]
+                    params['name'] = object_type[1]['name']['en']
+                    params['groupId'] = object_type[1]["groupID"]
+                    params['iconId'] = None
+                    if 'iconID' in object_type[1]:
+                        params['iconId'] = object_type[1]["iconID"]
+                    params['published'] = object_type[1]["published"]
+                    params['volume'] = None
+                    if 'volume' in object_type[1]:
+                        params['volume'] = object_type[1]["volume"]
+                    cur.execute(query, params)
+                    cont += 1
                 print(f'SDE: parsing {total} Types [{round((cont / total)*100,2)}%]  \r', end="")
             print(f'SDE: {total} Types parsed           ')
         cur.close()
@@ -382,7 +410,8 @@ class SdeParser:
             # set the solar system Id
             self._Location[self._counter]['id'] = element['solarSystemID']
             self._Location[self._counter]['name'] = self._get_name(element['solarSystemID'])
-            print('SDE: parsing data for system ' + self._Location[self._counter]["name"])
+            # print('SDE: parsing data for system ' + self._Location[self._counter]["name"])
+            print(f'SDE: Parsing {self._Location[0]["name"]} > {self._Location[1]["name"]} > {self._Location[2]["name"]}')
 
             params['id'] = element['solarSystemID']
             params['name'] = self._Location[self._counter]['name']
@@ -432,7 +461,8 @@ class SdeParser:
             self._Location[self._counter]["id"] = element['constellationID']
             self._Location[self._counter]["name"] = self._get_name(element['constellationID'])
 
-            print('SDE: parsing data for constellation ' + self._Location[self._counter]["name"])
+            # print('SDE: parsing data for constellation ' + self._Location[self._counter]["name"])
+            print(f'SDE: Parsing {self._Location[0]["name"]} > {self._Location[1]["name"]} >')
             params = {}
             params['id'] = element['constellationID']
             params['name'] = self._Location[self._counter]["name"]
@@ -468,7 +498,8 @@ class SdeParser:
             self._Location[self._counter]["id"] = region['regionID']
             self._Location[self._counter]["name"] = self._get_name(region['regionID'])
 
-            print('SDE: parsing data for region ' + self._Location[self._counter]["name"])
+            print(f'SDE: Parsing {self._Location[0]["name"]} > > ')
+            # print('SDE: parsing data for region ' + self._Location[self._counter]["name"])
             params = {}
             params['id'] = region['regionID']
             params['name'] = self._Location[self._counter]["name"]
@@ -565,8 +596,10 @@ class SdeParser:
         cur.close()
 
     def _parse_names(self):
+        """
+        Load the all the names used by entities and dump it into a temp table
+        """
         cur = self._db_driver.connection.cursor()
-        """Load the all the names used by entities and dump it into a temp table"""
         names_file = Path(self.yaml_directory).joinpath('bsd', 'invNames.yaml')
         if not names_file.exists():
             raise FileNotFoundError
@@ -606,7 +639,3 @@ class SdeParser:
             query = 'VACUUM;'
             cur.execute(query)
         cur.close()
-
-    @classmethod
-    def from_fuzzworks(cls, database_url):
-        raise NotImplementedError

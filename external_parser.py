@@ -11,10 +11,24 @@ from misc_utils import MiscUtils
 from database_driver import DatabaseDriver, DatabaseType
 
 
+class ExternalConfig():
+    # Optional Flags - This data don't belong to SDE it's populated by community
+    with_icebelts = False
+    with_triglavian_status = False
+    with_jove_observatories = True
+    with_special_ore = False
+
+
 class ExternalParser():
     """Parse data from different sources and integrate into the SDE database"""
     _db_type = None
     _data_directory = ''
+    __configuration = ExternalConfig()
+
+    @property
+    def configuration(self):
+        """ Returns config object"""
+        return self.__configuration
 
     @property
     def data_directory(self):
@@ -45,14 +59,18 @@ class ExternalParser():
         self._db_driver = DatabaseDriver(db_type, database_file)
         self._db_type = db_type
 
-    def _update_tables(self):
+    def create_triglavian(self):
+        """
+        This method creates table to insert Triglavian Invasiomn status
+        """
+        query = ''
         cur = self._db_driver.connection.cursor()
 
-        print("SMT: Creating Triglavian Status Catalog Table")
-        cur.execute('CREATE TABLE mapTriglavianStatus (trigStatusId INT NOT NULL PRIMARY KEY,'
-                    'trigStatusName TEXT NOT NULL);')
+        print("External: Adding Triglavian Invasion Systems with their correspondent status")
+        query = ('CREATE TABLE mapTriglavianStatus (trigStatusId INTEGER NOT NULL '
+                 'PRIMARY KEY, trigStatusName TEXT NOT NULL);')
+        cur.execute(query)
 
-        print("SMT: Filling Triglavian Status Table")
         values = ([0, 'None'],
                   [1, 'Edencom Minor Victory'],
                   [2, 'Final Liminality'],
@@ -62,36 +80,12 @@ class ExternalParser():
                  ' VALUES(?,?);')
         cur.executemany(query, values)
 
-        print("SMT: Creating Regional Abstract Map Table")
-        cur.execute('CREATE TABLE mapAbstractSystems (solarSystemId INT '
-                    'REFERENCES mapSolarSystems(solarSystemId) '
-                    'ON UPDATE CASCADE ON DELETE SET NULL,'
-                    'regionId INT NOT NULL REFERENCES mapRegions(RegionId) '
-                    'ON UPDATE CASCADE ON DELETE SET NULL,'
-                    'x INT NOT NULL, y INT NOT NULL, CONSTRAINT pkey PRIMARY KEY '
-                    '(solarSystemId, regionId) ON CONFLICT FAIL);')
-
-        print('SMT: Adding IceBelt, Jove Observatory and '
-              'Triglavian Invasion fields to the mapSolarSystems')
-        cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN iceBelt'
-                    ' BOOL NOT NULL DEFAULT 0;')
-        cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN joveObservatory'
-                    ' BOOL NOT NULL DEFAULT 0;')
         cur.execute('ALTER TABLE mapSolarSystems ADD COLUMN trigStatusID '
-                    'INT DEFAULT 0 REFERENCES mapTriglavianStatus (trigStatusID) '
-                    'ON UPDATE CASCADE ON DELETE SET NULL;')
-
-        # TODO: Add query to add A0 Star Solar systems as special mineral anomalies
-        print("SMT: Adding the Ducinium, Eifyrium, Mordunium and Ytirium Systems")
-        #cur.execute()
-
-        # indexes
-        print("SMT: Creating Indexes")
-        cur.execute('CREATE INDEX icebelts ON mapSolarSystems (solarSystemId, iceBelt);')
-        cur.execute('CREATE INDEX joveSystems ON mapSolarSystems (solarSystemId, joveObservatory);')
+                    'INTEGER DEFAULT 0 REFERENCES mapTriglavianStatus '
+                    '(trigStatusID) ON UPDATE CASCADE ON DELETE SET NULL;')
+        cur.execute('CREATE INDEX trigStatus ON mapSolarSystems (solarSystemId, trigStatusID);')
 
         # Adding Edecom Minor victory systems
-        print("SMT: Adding Triglavian Systems with their correspondent status")
         cur.execute('UPDATE mapSolarSystems SET trigStatusID=1 WHERE solarSystemID IN ('
                     ' 30003088,30003894,30004302,30005074,30003570,30003463'
                     ',30003788,30002724,30002999,30000102,30003919,30004978'
@@ -117,7 +111,7 @@ class ExternalParser():
                     '30010141,30005029,30003495)')
 
         # Adding Fortress Systems
-        cur.execute('UPDATE mapSolarSystems SET trigStatusID=3 WHERE solarSystemID IN ('
+        cur.execute('UPDATE mapSolarSystems SET trigStatusID=3 WHERE ''solarSystemID IN ('
                     '30003539,30003573,30005251,30004103,30000118,30004090,'
                     '30003548,30000113,30002386,30004973,30002266,30002530,'
                     '30004141,30002253,30003398,30003490,30003556,30002385,'
@@ -129,65 +123,119 @@ class ExternalParser():
                     '30005260,30000105,30004992,30002243,30003553)')
 
         # Adding Triglavian Minor Victory Systems
-        cur.execute('UPDATE mapSolarSystems SET trigStatusID=4 WHERE solarSystemID IN ('
+        cur.execute('UPDATE mapSolarSystems SET trigStatusID=4 WHERE '
+                    'solarSystemID IN ('
                     '30045331,30001400,30004244,30045345,30001358,30001401,'
                     '30045354,30002557,30002760,30002795,30004981,30001447,'
                     '30001390,30003076,30000163,30003073,30001391,30002771,'
                     '30005330,30000205,30003856,30002645,30045338,30002575,'
                     '30001383,30003464,30000182,30001685)')
+        cur.connection.commit()
+        cur.close()
+
+    def create_abstract_map(self):
+        """
+        Create the table where Dotlan date its inserted
+        """
+        query = ''
+        cur = self._db_driver.connection.cursor()
+        print("External: Creating Regional Abstract Map Table")
+        query = ('CREATE TABLE mapAbstractSystems (solarSystemId INTEGER '
+                 'NOT NULL REFERENCES mapSolarSystems(solarSystemId) '
+                 'ON UPDATE CASCADE ON DELETE SET NULL,'
+                 'regionId INT NOT NULL REFERENCES mapRegions(RegionId) '
+                 'ON UPDATE CASCADE ON DELETE SET NULL,'
+                 'x INT NOT NULL, y INT NOT NULL, CONSTRAINT pkey PRIMARY KEY '
+                 '(solarSystemId, regionId) ON CONFLICT FAIL);')
+        cur.execute(query)
+        cur.connection.commit()
+        cur.close()
+
+    def create_icebelts(self):
+        """
+        Create Icebelt table to fill with dotlan Data
+        """
+        query = ''
+        cur = self._db_driver.connection.cursor()
+
+        print("External: Creating Icebelt table")
+        query = ('ALTER TABLE mapSolarSystems ADD COLUMN iceBelt'
+                    ' BOOL NOT NULL DEFAULT 0;')
+        cur.execute(query)
+
+        query = 'CREATE INDEX icebelts ON mapSolarSystems (solarSystemId, iceBelt);'
+        cur.execute(query)
+
+        cur.connection.commit()
+        cur.close()
+
+    def create_jove_observatories(self):
+        """
+        Create Jove Observatories Table
+        """
+        query = ''
+        cur = self._db_driver.connection.cursor()
+
+        print("SMT: Adding Jove Systems")
+
+        query = ('ALTER TABLE mapSolarSystems ADD COLUMN joveObservatory'
+                ' BOOL NOT NULL DEFAULT 0;')
+        cur.execute(query)
+
+        query = ('CREATE INDEX joveSystems ON mapSolarSystems (solarSystemId, joveObservatory);')
+        cur.execute(query)
 
         # updating Jove Systems Part 1
-        print("SMT: Adding Jove Systems")
-        cur.execute('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ('
-                    '"0-4VQL","0-ARFO","0-G8NO","0-U2M4","0-VG7A","0-WVQS","0-XIDJ","01TG-J",'
-                    '"08S-39","0D-CHA","0LTQ-C","0LY-W1","0MV-4W","0P-U0Q","12YA-2","15U-JY",'
-                    '"16AM-3","1GT-MA","1KAW-T","1N-FJ8","1NZV-7","1PF-BC","1QZ-Y9","1VK-6B",'
-                    '"1W-0KS","1ZF-PJ","2-F3OE","2-KPW6","25S-6P","28O-JY","2B-3M4","2B7A-3",'
-                    '"2G38-I","2IGP-1","2PLH-3","2UK4-N","2ULC-J","2V-CS5","2WU-XT","3-BADZ",'
-                    '"3-JG3X","3-LJW3","33RB-O","373Z-7","37S-KO","39-DGG","3D5K-R","3DR-CR",'
-                    '"3GD6-8","3IK-7O","3JN9-Q","3L3N-X","3PPT-9","3Q-VZA","4-07MU","4-1ECP",'
-                    '"4-ABS8","4-CUM5","4-EFLU","4-QDIX","42-UOW","4AZV-W","4CJ-AC","4DTQ-K",'
-                    '"4E-EZS","4K0N-J","4LJ6-Q","4M-P1I","4NDT-W","4O-ZRI","4OIV-X","4RX-EE",'
-                    '"4XW2-D","5-2PQU","5-FGQI","5-O8B1","5-T0PZ","5-VKCN","51-5XG","52G-NZ",'
-                    '"57-YRU","5C-RPA","5E-EZC","5ED-4E","5HN-D6","5J4K-9","5NQI-E","5T-KM3",'
-                    '"5W3-DG","5ZXX-K","6-4V20","6-CZ49","6-I162","6-KPAB","617I-I","62O-UE",'
-                    '"6E-MOW","6EK-BV","6F-H3W","6FS-CZ","6L78-1","6O-XIO","6OYQ-Z","6QBH-S",'
-                    '"6U-MFQ","6WW-28","7-8EOE","7-A6XV","7-K5EL","77-KDQ","7BX-6F","7D-PAT",'
-                    '"7LHB-Z","7Q-8Z2","7T-0QS","7X-02R","8-AA98","8-OZU1","86L-9F","87-1PM",'
-                    '"87XQ-0","88A-RA","89-JPE","8B-SAJ","8DL-CP","8F-TK3","8KE-YS","8P9-BM",'
-                    '"8R-RTB","9-02G0","9-266Q","9-8GBA","9-980U","9-ZA4Z","92K-H2","99-0GS",'
-                    '"9IPC-E","9MWZ-B","9N-0HF","9P-870","9PX2-F","9U-TTJ","9UY4-H","A-5M31",'
-                    '"A-BO4V","A-GPTM","A-HZYL","A1F-22","A1RR-M","A3-LOG","Abai","Abha",'
-                    '"Abudban","AC-7LZ","AC2E-3","Access","Adahum","Adallier","Adiere",'
-                    '"Adrallezoen","Adrel","Aeter","Afivad","Agha","Agtver","AH-B84",'
-                    '"Aharalel","Ahkour","Ahrosseas","Ahtulaima","Aikoro","Aivoli","Aivonen",'
-                    '"Ajanen","AJCJ-1","Akhrad","Akkio","Akora","Aldilur","Alenia","Algasienan"'
-                    ',"Algogille","Alles","Alsavoinon","Altbrard","Amattens","Ameinaka","Ami",'
-                    '"Amoen","Ana","Anckee","Andole","Andrub","Anka","Annad","Ansasos"'
-                    ',"Antollare","APES-G","Arakor","Arant","Arayar","Arbaz","ARBX-9","Ardar",'
-                    '"Ardhis","Ardishapur Prime","Arifsdald","Arnon","Arnstur","Arraron",'
-                    '"Arzad","Arzieh","Asabona","Aset","Asgeir","Asghatil","Ashab","Ashmarir",'
-                    '"Asrios","Athinard","Atonder","Aubonnie","Augnais","Aulbres","Auner",'
-                    '"Aunia","Aurejet","Avair","AX-DOT","B-F1MI","B-G1LG","B-II34","B-VIP9",'
-                    '"B-XJX4","B9EA-G","Balle","Bamiette","Basgerin","Bayuka","Bazadod",'
-                    '"BEG-RL","Bekirdod","Bersyrim","BM-VYZ","Bogelek","Boranai","Bosboger",'
-                    '"BOZ1-O","BR-6XP","BU-IU4","BVRQ-O","BW-WJ2","BWF-ZZ","BY-S36","C-LP3N",'
-                    '"C-PEWN","C-VGYO","C-WPWH","C0T-77","C1G-XC","C2X-M5","C3J0-O","C6C-K9",'
-                    '"C8VC-S","Cailanar","Central Point","CHA2-Q","Chamja","Chamume","Channace",'
-                    '"Chanoun","Charmerout","Cherore","Chibi","CHP-76","CIS-7X","CJF-1P",'
-                    '"CJNF-J","CL-J9W","Claulenne","CNHV-M","Colelie","CR-0E5","Crielere",'
-                    '"Croleur","CT7-5V","CT8K-0","Cumemare","CX-1XF","D-0UI0","D-6H64","D-6WS1",'
-                    '"D-FVI7","D-I9HJ","D-W7F0","DAI-SH","Dastryns","DDI-B7","DE71-9","Defsunun",'
-                    '"DGDT-3","Dihra","Dimoohan","DJK-67","DK0-N8","Dom-Aphis","Doussivitte",'
-                    '"Dunraelare","DUU1-K","DUV-5Y","DY-40Z","E-B957","E-BFLT","E-BYOS","E-DOF2",'
-                    '"E-FIC0","E-VKJV","E-WMT7","E3-SDZ","E51-JE","E7VE-V","Earwik","Ebidan",'
-                    '"Ebtesham","ED-L9T","Egbonbet","Eglennaert","Egmar","EIH-IU","EK2-ET",'
-                    '"EKPB-3","Ekura","Enaluri","EOY-BG","EPCD-D","Eram","Erindur","Erstet",'
-                    '"Erstur","Erzoh","ES-UWY","Esteban","Esubara","Eszur","ETO-OT","EU0I-T",'
-                    '"EUU-4N","Evaulon","EX-0LQ","Eygfe","Eygfe","Eystur","F-749O","F-9PXR",'
-                    '"F-TQWO","F-UVBV","F-ZBO0","F2-NXA","F3-8X2","F39H-1","F4R2-Q","F5-CGW",'
-                    '"F5FO-U","F69O-M","F9E-KX","Fabin","Fanathor","Faspera","Faswiba","FD-MLJ",'
-                    '"FDZ4-A","FE-6YQ","Fihrneh","Fildar","Firbha","Fluekele","Fovihi")')
+
+        query = ('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ('
+                 '"0-4VQL","0-ARFO","0-G8NO","0-U2M4","0-VG7A","0-WVQS","0-XIDJ","01TG-J",'
+                 '"08S-39","0D-CHA","0LTQ-C","0LY-W1","0MV-4W","0P-U0Q","12YA-2","15U-JY",'
+                 '"16AM-3","1GT-MA","1KAW-T","1N-FJ8","1NZV-7","1PF-BC","1QZ-Y9","1VK-6B",'
+                 '"1W-0KS","1ZF-PJ","2-F3OE","2-KPW6","25S-6P","28O-JY","2B-3M4","2B7A-3",'
+                 '"2G38-I","2IGP-1","2PLH-3","2UK4-N","2ULC-J","2V-CS5","2WU-XT","3-BADZ",'
+                 '"3-JG3X","3-LJW3","33RB-O","373Z-7","37S-KO","39-DGG","3D5K-R","3DR-CR",'
+                 '"3GD6-8","3IK-7O","3JN9-Q","3L3N-X","3PPT-9","3Q-VZA","4-07MU","4-1ECP",'
+                 '"4-ABS8","4-CUM5","4-EFLU","4-QDIX","42-UOW","4AZV-W","4CJ-AC","4DTQ-K",'
+                 '"4E-EZS","4K0N-J","4LJ6-Q","4M-P1I","4NDT-W","4O-ZRI","4OIV-X","4RX-EE",'
+                 '"4XW2-D","5-2PQU","5-FGQI","5-O8B1","5-T0PZ","5-VKCN","51-5XG","52G-NZ",'
+                 '"57-YRU","5C-RPA","5E-EZC","5ED-4E","5HN-D6","5J4K-9","5NQI-E","5T-KM3",'
+                 '"5W3-DG","5ZXX-K","6-4V20","6-CZ49","6-I162","6-KPAB","617I-I","62O-UE",'
+                 '"6E-MOW","6EK-BV","6F-H3W","6FS-CZ","6L78-1","6O-XIO","6OYQ-Z","6QBH-S",'
+                 '"6U-MFQ","6WW-28","7-8EOE","7-A6XV","7-K5EL","77-KDQ","7BX-6F","7D-PAT",'
+                 '"7LHB-Z","7Q-8Z2","7T-0QS","7X-02R","8-AA98","8-OZU1","86L-9F","87-1PM",'
+                 '"87XQ-0","88A-RA","89-JPE","8B-SAJ","8DL-CP","8F-TK3","8KE-YS","8P9-BM",'
+                 '"8R-RTB","9-02G0","9-266Q","9-8GBA","9-980U","9-ZA4Z","92K-H2","99-0GS",'
+                 '"9IPC-E","9MWZ-B","9N-0HF","9P-870","9PX2-F","9U-TTJ","9UY4-H","A-5M31",'
+                 '"A-BO4V","A-GPTM","A-HZYL","A1F-22","A1RR-M","A3-LOG","Abai","Abha",'
+                 '"Abudban","AC-7LZ","AC2E-3","Access","Adahum","Adallier","Adiere",'
+                 '"Adrallezoen","Adrel","Aeter","Afivad","Agha","Agtver","AH-B84","Aharalel",'
+                 '"Ahkour","Ahrosseas","Ahtulaima","Aikoro","Aivoli","Aivonen","Ajanen","AJCJ-1",'
+                 '"Akhrad","Akkio","Akora","Aldilur","Alenia","Algasienan","Algogille","Alles",'
+                 '"Alsavoinon","Altbrard","Amattens","Ameinaka","Ami","Amoen","Ana","Anckee",'
+                 '"Andole","Andrub","Anka","Annad","Ansasos","Antollare","APES-G","Arakor",'
+                 '"Arant","Arayar","Arbaz","ARBX-9","Ardar","Ardhis","Ardishapur Prime",'
+                 '"Arifsdald","Arnon","Arnstur","Arraron","Arzad","Arzieh","Asabona","Aset",'
+                 '"Asgeir","Asghatil","Ashab","Ashmarir","Asrios","Athinard","Atonder",'
+                 '"Aubonnie","Augnais","Aulbres","Auner","Aunia","Aurejet","Avair","AX-DOT",'
+                 '"B-F1MI","B-G1LG","B-II34","B-VIP9","B-XJX4","B9EA-G","Balle","Bamiette",'
+                 '"Basgerin","Bayuka","Bazadod","BEG-RL","Bekirdod","Bersyrim","BM-VYZ",'
+                 '"Bogelek","Boranai","Bosboger","BOZ1-O","BR-6XP","BU-IU4","BVRQ-O","BW-WJ2",'
+                 '"BWF-ZZ","BY-S36","C-LP3N","C-PEWN","C-VGYO","C-WPWH","C0T-77","C1G-XC",'
+                 '"C2X-M5","C3J0-O","C6C-K9","C8VC-S","Cailanar","Central Point","CHA2-Q",'
+                 '"Chamja","Chamume","Channace","Chanoun","Charmerout","Cherore","Chibi",'
+                 '"CHP-76","CIS-7X","CJF-1P","CJNF-J","CL-J9W","Claulenne","CNHV-M",'
+                 '"Colelie","CR-0E5","Crielere","Croleur","CT7-5V","CT8K-0","Cumemare","CX-1XF",'
+                 '"D-0UI0","D-6H64","D-6WS1","D-FVI7","D-I9HJ","D-W7F0","DAI-SH","Dastryns",'
+                 '"DDI-B7","DE71-9","Defsunun","DGDT-3","Dihra","Dimoohan","DJK-67","DK0-N8",'
+                 '"Dom-Aphis","Doussivitte","Dunraelare","DUU1-K","DUV-5Y","DY-40Z","E-B957",'
+                 '"E-BFLT","E-BYOS","E-DOF2","E-FIC0","E-VKJV","E-WMT7","E3-SDZ","E51-JE",'
+                 '"E7VE-V","Earwik","Ebidan","Ebtesham","ED-L9T","Egbonbet","Eglennaert","Egmar",'
+                 '"EIH-IU","EK2-ET","EKPB-3","Ekura","Enaluri","EOY-BG","EPCD-D","Eram","Erindur",'
+                 '"Erstet","Erstur","Erzoh","ES-UWY","Esteban","Esubara","Eszur","ETO-OT","EU0I-T",'
+                 '"EUU-4N","Evaulon","EX-0LQ","Eygfe","Eygfe","Eystur","F-749O","F-9PXR","F-TQWO",'
+                 '"F-UVBV","F-ZBO0","F2-NXA","F3-8X2","F39H-1","F4R2-Q","F5-CGW","F5FO-U","F69O-M",'
+                 '"F9E-KX","Fabin","Fanathor","Faspera","Faswiba","FD-MLJ","FDZ4-A","FE-6YQ",'
+                 '"Fihrneh","Fildar","Firbha","Fluekele","Fovihi")')
 
         # updating Jove Systems Part 2
         cur.execute('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ('
@@ -280,7 +328,27 @@ class ExternalParser():
                     '"Ziriert","ZK-YQ3","ZM-DNR","ZN0-SR","ZO-4AR","ZO-P5K","ZOPZ-6","ZOYW-O"'
                     ',"ZQ-Z3Y","ZXB-VC","ZZK-VF","Uplingur","LTT-AP")')
 
+        cur.connection.commit()
         cur.close()
+
+    def _update_tables(self):
+        self.create_abstract_map()
+
+        if self.configuration.with_icebelts:
+            self.create_icebelts()
+
+        if self.configuration.with_triglavian_status:
+            self.create_triglavian()
+
+        if self.configuration.with_jove_observatories:
+            self.create_jove_observatories()
+
+        # TODO: Add query to add A0 Star Solar systems as special
+        # mineral anomalies
+        print('SMT: Adding the Ducinium, Eifyrium, '
+              'Mordunium and Ytirium Systems')
+        #cur.execute()
+        #cur.close()
 
     def _import_csv(self, path, value_id=0):
         """reads a CSV file and parse the identifiers to return it a process it"""
@@ -331,7 +399,7 @@ class ExternalParser():
                      ' VALUES (:id,:regionId,:X,:Y);')
             cur.execute(query, solar_system_ids)
         cur.close()
-        self._db_driver.connection.commit()
+        cur.connection.commit()
 
     def get_all_regions(self):
         """Function to get all regions from SDE and download the svg maps from dotlan"""

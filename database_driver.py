@@ -76,7 +76,7 @@ class DatabaseDriver:
         # SQLite database file header is 100 bytes
         if database_file.stat().st_size < 100:
             return False
-        with open(database_file, 'rb', encoding='UTF-8') as file:
+        with open(database_file, 'rb') as file:
             header = file.read(100)
         return header[:16] == b'SQLite format 3\x00'
 

@@ -8,26 +8,30 @@ import zipfile
 import bz2
 import requests
 import classutilities
+import hashlib
+from functools import partial
 
 
 class MiscUtils(object):
     __chunk_size = 2391975
 
     @classutilities.classproperty
-    def chunk_size(self):
+    def chunk_size(cls):
         """the size of the chunk downloaded"""
-        return self.__chunk_size
+        return cls.__chunk_size
 
     @chunk_size.setter
-    def chunk_size(self, size):
-        self.__chunk_size = size
+    def chunk_size(cls, size):
+        cls.__chunk_size = size
 
     @classmethod
     # TODO: Convertir este metodo en algo mas adecuado para uso de clases
     def download_file(cls, url, filename=None):
-        """Download a file from Internet, but it assumes it should be on the current path
+        """
+        Download a file from Internet, but it assumes it should be on the current path
         and no other parameters are present on the url. This methond doesn't overwrite files,
-        so you need to be sure that file doesn't exists before download anything."""
+        so you need to be sure that file doesn't exists before download anything.
+        """
         file_path = ""
         total_length = 0
         if isinstance(filename, str):
@@ -54,7 +58,9 @@ class MiscUtils(object):
 
     @classmethod
     def bz2_decompress(cls, compressed_filepath, uncompressed_filepath):
-        """Decompress the database that we get from fuzzworks"""
+        """
+        Decompress the BZ2 files
+        """
         nbytes = 0
         zip_file = None
         unzip_file = None
@@ -79,6 +85,22 @@ class MiscUtils(object):
         """
         Extract content from a zip file using a path as output
         """
-        with zipfile.ZipFile(compressed_filepath, 'r') as zip_ref:
-            zip_ref.extractall(output_path)
-            print('SDE: Decompressing File')
+        try:
+            with zipfile.ZipFile(compressed_filepath, 'r') as zip_ref:
+                zip_ref.extractall(output_path)
+                print(f'SDE: Decompressing {compressed_filepath}')
+                return True
+        except zipfile.BadZipFile:
+            return False
+        
+    @classmethod
+    def md5sum(cls, filename):
+        """
+        Calculate MD5 checksum for file, this is not needed in 3.11 or later 
+        because it has a native function
+        """
+        with open(filename, mode='rb') as f:
+            d = hashlib.md5()
+            for buf in iter(partial(f.read, 128), b''):
+                d.update(buf)
+        return d.hexdigest()

@@ -17,6 +17,7 @@ FUZZ_DB_NAME = 'sqlite-latest.sqlite.bz2'
 SDE_FILENAME = 'sde.zip'
 SDE_CHECKSUM = 'checksum'
 OUT_FILENAME = 'smt.db'
+MD5_CHECKSUM = ''
 MiscUtils.chunk_size = 2391975
 
 source = []
@@ -27,61 +28,83 @@ source.append(SDE_URL + SDE_FILENAME)
 source.append(Path('.').joinpath(SDE_FILENAME))
 source.append(Path('.').joinpath(OUT_FILENAME))
 
-# Download the MD5 Checksum
-MiscUtils.download_file(source[2])
 
-# this chunk of code detects if a new File exists
-UPDATE_DETECTED = False
-if Path(source[1]).exists():
-    md5File = []
-    md5File.append(open(source[0], 'rt', encoding='UTF-8'))
-    md5File.append(open(source[1], 'rt', encoding='UTF-8'))
-    if md5File[0].read() != md5File[1].read():
-        UPDATE_DETECTED = True
-    md5File[0].close()
-    md5File[1].close()
-    # Avoiding an Error on Windows OS, because the file its in use
-    if UPDATE_DETECTED:
-        source[1].unlink()
-else:
-    UPDATE_DETECTED = True
+def download_control(file_name, retries=3):
+    """
+    Controls the download of file
+    """
+    completed = False
+    transfer_try = 0
+    bytes_downloaded = 0
+    while transfer_try < retries and completed is False:
+        try:
+            bytes_downloaded = MiscUtils.download_file(file_name)
+            completed = True
+        except TimeoutError:
+            transfer_try += 1
+            print(f'Transfer timeout, Retrying ({transfer_try}/{retries})')
+    if transfer_try == retries:
+        print('Maximum retries exceded, aborting...')
+    return bytes_downloaded
 
-# we take an action based on what was detected
-if UPDATE_DETECTED:
-    print("SDE: a new version has been detected, proceding to download")
+
+def check_md5():
+    """
+    Method that download and verify SDE downloads
+    """
+    md5_str = []
     if source[0].exists():
-        source[0].rename(source[1].name)
+        print('SDE: deleting old incomplete checksum')
+        source[0].unlink()
+    print('SDE: Downloading MD5 Checksum ...')
+    downloaded = download_control(source[2])
+    print(f"SDE: Downloaded {downloaded} bytes          ")
+    for cont in range(0, 2):
+        if Path(source[cont]).exists():
+            with open(source[cont], 'rt', encoding='UTF-8') as md5_file:
+                md5_str.append(md5_file.read())
+    if len(md5_str) > 1:
+        if md5_str[0] == md5_str[1]:
+            print("SDE: The database it is already updated")
+            return True
+    print("SDE: a new version has been detected, proceding to download")
+    if source[1].exists():
+        source[1].unlink()
+        source[0].rename(source[1])
     if source[4].exists():
-        print("A previous version has been detected... deleting")
         source[4].unlink()
-    # if Fuzzworks is not being used, then we delete the uncompessed directory
+    print('SDE: Downloading SDE database ...')
+    downloaded = download_control(source[3])
+    print(f"SDE: Downloaded {(downloaded/(1024**2)),2} Mb          ")
+    md5_str.append(MiscUtils.md5sum(source[4]))
+    if md5_str[-1] != md5_str[-2]:
+        print('SDE: Error in Downloaded Database, Aborting ...')
+        return False
+    return True
+
+
+if check_md5():
+    # we delete the uncompessed directory
     sdePath = Path('.').joinpath('sde')
     if sdePath.exists():
         shutil.rmtree(sdePath)
-    mbytesDownloaded = MiscUtils.download_file(source[3]) / (1024 * 1024)
-    print(f"SDE: Downloaded {mbytesDownloaded,2}Mb          ")
-else:
-    print("SDE: The database it is already updated")
+    if source[5].exists():
+        source[5].unlink()
 
-# remove the database if already exists, because we don't know the state of such file
-if source[5].exists():
-    source[5].unlink()
-
-# decompressing the database
-MiscUtils.zip_decompress(source[4], Path('.'))
-processor = SdeParser(Path('.').joinpath('sde'), source[5])
-processor.configuration.extended_coordinates = False
-processor.configuration.map_abbysal = False
-processor.configuration.map_kspace = True
-processor.configuration.map_void = False
-processor.configuration.map_wspace = False
-processor.configuration.with_icebelts = True
-processor.configuration.with_triglavian_status = True
-processor.configuration.with_special_ore = True
-processor.create_table_structure()
-processor.parse_data()
-processor.close()
-
-if processor is not None:
-    eParser = ExternalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
-    eParser.process()
+    # decompressing the database
+    if MiscUtils.zip_decompress(source[4], Path('.')):
+        processor = SdeParser(sdePath, source[5])
+        processor.configuration.extended_coordinates = False
+        processor.configuration.map_abbysal = False
+        processor.configuration.map_kspace = True
+        processor.configuration.map_void = False
+        processor.configuration.map_wspace = False
+        processor.create_table_structure()
+        processor.parse_data()
+        processor.close()
+        eParser = ExternalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
+        eParser.configuration.with_icebelts = True
+        eParser.configuration.with_triglavian_status = True
+        eParser.configuration.with_jove_observatories = True
+        eParser.configuration.with_special_ore = True
+        eParser.process()
