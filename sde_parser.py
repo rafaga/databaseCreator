@@ -4,6 +4,7 @@
 from pathlib import Path
 import yaml
 from database_driver import DatabaseDriver, DatabaseType
+from data_object import GenericEntity
 
 
 class SdeConfig:
@@ -22,11 +23,38 @@ class SdeConfig:
     with_star_catalog = True
 
 
+class Data_Brigde():
+    __star_group_id = 0
+    __star_type_id = {}
+
+    @property
+    def star_group_id(self):
+        """
+        Property to get Star GroupID
+        """
+        return self.__star_group_id
+
+    @star_group_id.setter
+    def star_group_id(self, value):
+        """
+        Property to set Star GroupID
+        """
+        if isinstance(value,int):
+            self.__star_group_id = value
+
+    @property
+    def star(self, type_id):
+        return self.__star_type_id[type_id]
+
+    @star.setter
+    def star(self, type_id, value):
+        self.__star_type_id[type_id] = value
+
+
 class DirectoryNotFoundError(Exception):
     """
-    Generic class for Directory Not foun error
+    Generic class for Directory Not found error
     """
-    pass
 
 
 class SdeParser:
@@ -34,11 +62,12 @@ class SdeParser:
     _yaml_directory = None
     _db_driver = None
     _db_type = None
-    _config = None
+    _config = SdeConfig()
     # this counter permits to detect what item we are iterating now
     _counter = -1
     # this representes the current location (Region,Constellation,System)
     _Location = [{"name": None, "id": None}, {"name": None, "id": None}, {"name": None, "id": None}]
+    _stars = GenericEntity()
 
     @property
     def configuration(self):
@@ -85,8 +114,8 @@ class SdeParser:
         """
         print('[', end='')
         calculated_value = (value % lenght)
-        for x in range(0, width):
-            if x >= calculated_value or x < calculated_value - lenght:
+        for character in range(0, width):
+            if character >= calculated_value or character < calculated_value - lenght:
                 print('▉', end='')
             else:
                 print(' ', end='')
@@ -236,17 +265,22 @@ class SdeParser:
                      '(solarSystemId, planetaryIndex);')
             cur.execute(query)
 
-            # Star Type - SQLite
-            query = ('CREATE TABLE starTypes (starTypeId INTEGER NOT NULL'
-                     'PRIMARY KEY )')
+            # type - Star - SQLite
+            query = ('CREATE TABLE typeStar ('
+                     'starTypeId INTEGER PRIMARY KEY AUTOINCREMENT,'
+                     'typeId INTEGER NOT NULL REFERENCES invTypes(typeId) '
+                     'ON UPDATE CASCADE ON DELETE CASCADE, '
+                     'name VARCHAR(4) NOT NULL,'
+                     'color VARCHAR(20) NOT NULL)')
+            cur.execute(query)
 
             # Stars - SQLite (typeId Here)
             query = ('CREATE TABLE mapStars (starId INT NOT NULL PRIMARY KEY '
                      ',solarSystemId INTEGER REFERENCES mapSolarSystems'
                      '(solarSystemId) ON UPDATE CASCADE ON DELETE RESTRICT '
                      ',locked BOOL NOT NULL ,radius INTEGER NOT NULL, '
-                     'typeId INT NOT NULL REFERENCES invTypes(typeId) '
-                     'ON UPDATE CASCADE ON DELETE SET NULL '
+                     'starTypeId INT NOT NULL REFERENCES typeStar(starTypeId) '
+                     'ON UPDATE CASCADE ON DELETE CASCADE'
                      ');')
             cur.execute(query)
 
@@ -269,10 +303,12 @@ class SdeParser:
             cur.execute(query)
 
             # Stations - SQLite
-            query = ('CREATE TABLE staStation (idStation INT NOT NULL PRIMARY KEY ,stationName TEXT NOT NULL'
-                     ',solarSystemId INT REFERENCES mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
+            query = ('CREATE TABLE staStation (idStation INT NOT NULL PRIMARY KEY, '
+                     'stationName TEXT NOT NULL,solarSystemId INT REFERENCES '
+                     'mapSolarSystems(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL'
                      ',stationType INT NOT NULL'
                      ');')
+            cur.execute(query)
 
             # Corporation/Station - SQLite
             # ',stationId INT REFERENCES stations(stationId) ON UPDATE CASCADE ON DELETE SET NULL'
@@ -296,7 +332,7 @@ class SdeParser:
 
     def parse_data(self):
         """
-        This method provides centralized point to parse all data 
+        This method provides centralized point to parse all data
         and put it into tables
         """
         self._parse_names()
@@ -317,14 +353,23 @@ class SdeParser:
             print('SDE: parsing Void Systems')
             self._read_directory(universe_dir.joinpath('void'))
 
+    def add_star_type(self,type_id, name, color):
+        """
+        Method that insert star data into custom table
+        """
+        cur = self._db_driver.connection.cursor()
+        query = 'INSERT INTO typeStar (typeId, name, color) VALUES (?,?,?)'
+        params = [type_id,name,color]
+        cur.execute(query,params)
+        query = 'SELECT starTypeId FROM typeStar WHERE typeId=?'
+        params=[type_id]
+        results=cur.execute(query,params)
+        row = results.fetchone()
+        return row[0]
+
     def _parse_types(self, path_object):
         cur = self._db_driver.connection.cursor()
         process = {}
-        query = ('SELECT groupId, groupName FROM invGroups WHERE groupName IN (?);')
-        result = cur.execute(query,['sun'])
-        rows = result.fetchall()
-        for row in rows:
-            process[row[0]]=row[1]
         query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId, published, volume) VALUES (:id ,:groupId, :name, :iconId, :published, :volume)')
         with path_object.open(encoding='UTF-8') as file:
             yaml_types = yaml.safe_load(file)
@@ -346,6 +391,10 @@ class SdeParser:
                     if 'volume' in object_type[1]:
                         params['volume'] = object_type[1]["volume"]
                     cur.execute(query, params)
+                    if params['groupId'] == self._stars.id:
+                        parse_name = params['name'].split(' ')
+                        star_id = self.add_star_type(object_type[0],parse_name[1],parse_name[2][1:-1])
+                        self._stars.entity_type[object_type[0]]=star_id
                     cont += 1
                 print(f'SDE: parsing {total} Types [{round((cont / total)*100,2)}%]  \r', end="")
             print(f'SDE: {total} Types parsed           ')
@@ -359,13 +408,19 @@ class SdeParser:
             cont = 0
             for group in yGroups.items():
                 params = {}
-                query = ('INSERT INTO invGroups(groupId, categoryId, groupName, anchorable) VALUES (:id ,:catId, :name, :anchor)')
+                query = ('INSERT INTO invGroups(groupId, categoryId, groupName, anchorable) '
+                         'VALUES (:id ,:catId, :name, :anchor)')
                 params['id'] = group[0]
                 params['catId'] = group[1]["categoryID"]
                 params['name'] = group[1]["name"]["en"]
                 params['anchor'] = group[1]["anchorable"]
                 cont += 1
                 cur.execute(query, params)
+
+                # Detecting Sun Type to parse data on stars
+                if params['name'] == 'Sun':
+                    self._stars.id=params['id']
+
                 print(f'SDE: parsing {total} groups [{round((cont / total)*100,2)}%]  \r', end="")
             print(f'SDE: {total} Groups parsed            ')
         cur.close()
@@ -378,7 +433,8 @@ class SdeParser:
             cont = 0
             for category in yCategories.items():
                 params = {}
-                query = ('INSERT INTO invCategories(categoryID, categoryName, published) VALUES (:id ,:name, :publish)')
+                query = ('INSERT INTO invCategories(categoryID, categoryName,'
+                         ' published) VALUES (:id ,:name, :publish)')
                 params['id'] = category[0]
                 params['name'] = category[1]["name"]["en"]
                 params['publish'] = category[1]["published"]
@@ -562,8 +618,10 @@ class SdeParser:
 
     def _parse_planets(self, node):
         cur = self._db_driver.connection.cursor()
-        query = ('INSERT INTO mapPlanets (planetId, solarSystemId, planetaryIndex, fragmented, radius, locked, typeId,'
-                 'positionX, positionY, positionZ) VALUES (:id, :solarSystemId, :planetIndex, :fragmented, :radius, '
+        query = ('INSERT INTO mapPlanets (planetId, solarSystemId, planetaryIndex,'
+                 'fragmented, radius, locked, typeId, '
+                 'positionX, positionY, positionZ) VALUES (:id, :solarSystemId, '
+                 ':planetIndex, :fragmented, :radius, '
                  ':locked, :typeId, :posX, :posY, :posZ );')
         for element in node.items():
             params = {}
@@ -585,13 +643,14 @@ class SdeParser:
     def _parse_star(self, node):
         params = {}
         cur = self._db_driver.connection.cursor()
-        query = ('INSERT INTO mapStars ( starId, solarSystemId, locked, radius, typeId ) VALUES '
+        query = ('INSERT INTO mapStars ( starId, solarSystemId, locked, '
+                 'radius, startypeId ) VALUES '
                  '(:starId, :solarSystemId, :locked, :radius, :typeId)')
         params['starId'] = node['id']
         params['solarSystemId'] = self._Location[2]['id']
         params['locked'] = node['statistics']['locked']
         params['radius'] = node['statistics']['radius']
-        params['typeId'] = node['typeID']
+        params['typeId'] = self._stars.entity_type[node['typeID']]
         cur.execute(query, params)
         cur.close()
 

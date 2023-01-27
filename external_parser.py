@@ -347,6 +347,8 @@ class ExternalParser():
         # mineral anomalies
         print('SMT: Adding the Ducinium, Eifyrium, '
               'Mordunium and Ytirium Systems')
+        if self.configuration.with_special_ore:
+            self.create_special_anomalies()
         #cur.execute()
         #cur.close()
 
@@ -414,9 +416,23 @@ class ExternalParser():
         cur.close()
         return rows
 
-    def _import_special_mineral_anomalies(self):
-        # TODO: Implementar la actuaizacion de los sistemas con las nuevas anomalias
-        raise NotImplementedError
+    def create_special_anomalies(self):
+        """
+        Import Special Ore anomalies 
+        """
+        cur = self._db_driver.connection.cursor()
+
+        query = ('ALTER TABLE mapSolarSystems ADD COLUMN specialOreAnom'
+                ' BOOL NOT NULL DEFAULT 0;')
+        cur.execute(query)
+
+        query = ('UPDATE mapSolarSystems AS ms SET specialOreAnom=1 FROM '
+                 '(SELECT m.solarSystemId FROM typeStar AS ts INNER JOIN '
+                 'mapStars AS m ON (ts.starTypeId=m.starTypeId) '
+                 ' WHERE name=?) AS z WHERE z.solarSystemId = ms.solarSystemId;')
+        params = ['A0']
+        cur.execute(query, params)
+
 
     def process(self):
         """ Retrieving all Regions from Dotlan to parse the SVG data """
