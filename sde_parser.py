@@ -239,13 +239,14 @@ class SdeParser:
 
             # Gates - SQLite (typeId here)
             query = ('CREATE TABLE mapSystemGates (systemGateId INT NOT NULL '
-                     ',solarSystemID INT NOT NULL REFERENCES mapSolarSystems '
+                     ',solarSystemID INTEGER NOT NULL REFERENCES mapSolarSystems '
                      '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
+                     'destination INTEGER REFERENCES mapSystemGates(systemGateId), '
                      'typeId INT NOT NULL REFERENCES invTypes(typeId) ON '
                      'UPDATE CASCADE ON DELETE SET NULL ,positionX FLOAT '
-                     'NOT NULL ,positionY FLOAT NOT NULL ,positionZ FLOAT '
-                     'NOT NULL ,CONSTRAINT pkey PRIMARY '
-                     'KEY (systemGateId,solarSystemID) ON CONFLICT FAIL );')
+                     'NOT NULL, positionY FLOAT NOT NULL, positionZ FLOAT '
+                     'NOT NULL, CONSTRAINT pkey PRIMARY KEY (systemGateId,solarSystemID) '
+                     'ON CONFLICT FAIL );')
             cur.execute(query)
 
             # Planets - SQLite (typeId here)
@@ -581,8 +582,10 @@ class SdeParser:
 
     def _parse_gates(self, node):
         cur = self._db_driver.connection.cursor()
-        query = ('INSERT INTO mapSystemGates (systemGateId, solarSystemId, typeId, positionX, positionY, positionZ)'
-                 ' VALUES (:id, :solarSystemId, :typeId, :posX, :posY, :posZ );')
+        query = ('INSERT INTO mapSystemGates (systemGateId, solarSystemId, typeId, '
+                 'positionX, positionY, positionZ, destination) '
+                 'VALUES (:id, :solarSystemId, :typeId, :posX, '
+                 ':posY, :posZ, :destination );')
         for element in node.items():
             params = {}
             params['id'] = element[0]
@@ -591,6 +594,7 @@ class SdeParser:
             params['posX'] = element[1]['position'][0]
             params['posY'] = element[1]['position'][1]
             params['posZ'] = element[1]['position'][2]
+            params['destination'] = element[1]['destination']
             cur.execute(query, params)
         cur.close()
 
