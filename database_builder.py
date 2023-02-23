@@ -16,7 +16,7 @@ MAPS_URL = 'http://evemaps.dotlan.net/svg/'
 FUZZ_DB_NAME = 'sqlite-latest.sqlite.bz2'
 SDE_FILENAME = 'sde.zip'
 SDE_CHECKSUM = 'checksum'
-OUT_FILENAME = 'smt.db'
+OUT_FILENAME = 'sde.db'
 MD5_CHECKSUM = ''
 MiscUtils.chunk_size = 2391975
 

@@ -239,13 +239,13 @@ class SdeParser:
 
             # Gates - SQLite (typeId here)
             query = ('CREATE TABLE mapSystemGates (systemGateId INT NOT NULL '
-                     ',solarSystemID INTEGER NOT NULL REFERENCES mapSolarSystems '
+                     ',solarSystemId INTEGER NOT NULL REFERENCES mapSolarSystems '
                      '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
                      'destination INTEGER REFERENCES mapSystemGates(systemGateId), '
                      'typeId INT NOT NULL REFERENCES invTypes(typeId) ON '
                      'UPDATE CASCADE ON DELETE SET NULL ,positionX FLOAT '
                      'NOT NULL, positionY FLOAT NOT NULL, positionZ FLOAT '
-                     'NOT NULL, CONSTRAINT pkey PRIMARY KEY (systemGateId,solarSystemID) '
+                     'NOT NULL, CONSTRAINT pkey PRIMARY KEY (systemGateId,solarSystemId) '
                      'ON CONFLICT FAIL );')
             cur.execute(query)
 
@@ -294,9 +294,10 @@ class SdeParser:
             query = ('CREATE TABLE mapMoons (moonId INT NOT NULL '
                      ',solarSystemId INTEGER REFERENCES mapSolarSystems'
                      '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL, '
-                     'moonIndex INTEGER NOT NULL, positionX FLOAT NOT NULL, '
-                     'positionY FLOAT NOT NULL, positionZ FLOAT NOT NULL, '
-                     'radius INTEGER, '
+                     'moonIndex INTEGER NOT NULL, planetId INTEGER REFERENCES '
+                     'mapPlanets(planetId) ON UPDATE CASCADE ON DELETE SET NULL,'
+                     'positionX FLOAT NOT NULL, positionY FLOAT NOT NULL,'
+                     'positionZ FLOAT NOT NULL, radius INTEGER, '
                      'typeId INT REFERENCES invTypes(typeId) ON UPDATE CASCADE '
                      'ON DELETE SET NULL ,CONSTRAINT pkey PRIMARY KEY '
                      '(solarSystemId, moonId) ON CONFLICT FAIL '
@@ -434,7 +435,7 @@ class SdeParser:
             cont = 0
             for category in yCategories.items():
                 params = {}
-                query = ('INSERT INTO invCategories(categoryID, categoryName,'
+                query = ('INSERT INTO invCategories(categoryId, categoryName,'
                          ' published) VALUES (:id ,:name, :publish)')
                 params['id'] = category[0]
                 params['name'] = category[1]["name"]["en"]
@@ -598,17 +599,18 @@ class SdeParser:
             cur.execute(query, params)
         cur.close()
 
-    def _parse_moons(self, node):
+    def _parse_moons(self, planet_id, node):
         cur = self._db_driver.connection.cursor()
         cont = 1
-        query = ('INSERT INTO mapMoons (moonId, solarSystemId, moonIndex, typeid, radius, positionX, '
-                 'positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, :typeId, :radius, :posX, '
-                 ':posY, :posZ );')
+        query = ('INSERT INTO mapMoons (moonId, solarSystemId, moonIndex, planetId, typeid, radius, positionX, '
+                 'positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, :planetId ,:typeId, :radius, '
+                 ':posX, :posY, :posZ );')
         for element in node.items():
             params = {}
             params['id'] = element[0]
             params['solarSystemId'] = self._Location[2]['id']
             params['moonIndex'] = cont
+            params['planetId'] = planet_id
             params['typeId'] = element[1]["typeID"]
             params['radius'] = None
             if 'statistics' in element[1]:
@@ -641,7 +643,7 @@ class SdeParser:
             params['posZ'] = element[1]['position'][2]
             cur.execute(query, params)
             if 'moons' in element[1]:
-                self._parse_moons(element[1]['moons'])
+                self._parse_moons(element[0], element[1]['moons'])
         cur.close()
 
     def _parse_star(self, node):
