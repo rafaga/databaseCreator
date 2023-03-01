@@ -16,6 +16,7 @@ class SdeConfig:
     map_wspace = True
     map_abbysal = True
     map_void = False
+    projection_algorithm='isometric' # posibles values are 'isometric' and 'dimetric'
 
     # TODO: implement these flags, these flags depend upon map Flags.
     with_moons = True
@@ -93,6 +94,20 @@ class SdeParser:
         self._db_driver = DatabaseDriver(db_type, database_file)
         self._db_type = db_type
         self._config = SdeConfig()
+ 
+    def calculate_isometric_projection(self, x, y, z):
+        """calculate isometric projection coordinates over 3D points"""
+        """ based upon https://www.compuphase.com/axometr.htm formulas """
+        n_x = x - z
+        n_y = y + ((x + z)/2)
+        return ([n_x, n_y])
+
+    def calculate_dimetric_projection(self, x, y, z):
+        """calculate military oblique projection coordinates over 3D points"""
+        """ based upon https://www.compuphase.com/axometr.htm formulas """ 
+        n_x = x + (z / 4)
+        n_y = y + (z / 2)
+        return ([n_x, n_y])
 
     def _read_directory(self, directory_path):
         for element in directory_path.iterdir():
@@ -213,7 +228,8 @@ class SdeParser:
                      ',corridor BOOL NOT NULL ,fringe BOOL NOT NULL ,hub BOOL NOT NULL '
                      ',international BOOL NOT NULL ,luminosity FLOAT NOT NULL '
                      ',radius FLOAT NOT NULL ,centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL '
-                     ',centerZ FLOAT NOT NULL ')
+                     ',centerZ FLOAT NOT NULL, projX FLOAT NOT NULL DEFAULT(0.0) '
+                     ',projY FLOAT NOT NULL DEFAULT(0.0) ')
 
             if self._config.extended_coordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
@@ -456,10 +472,14 @@ class SdeParser:
                  ',centerY ,centerZ ,regional ,security ,securityClass ')
         if self._config.extended_coordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ '
+        if self._config.projection_algorithm == 'isometric' or self._config.projection_algorithm == 'dimetric':
+            query += ',projX ,projY '
         query += (') VALUES ( :id, :name, :constellationId, :corridor, :fringe, :hub, :international, '
                   ':luminosity, :radius, :centerX, :centerY, :centerZ, :regional, :security, :securityClass')
         if self._config.extended_coordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ '
+        if self._config.projection_algorithm == 'isometric' or self._config.projection_algorithm == 'dimetric':
+            query += ',:projX ,:projY '
         query += ');'
 
         with path_object.open(encoding='UTF-8') as file:
@@ -490,6 +510,14 @@ class SdeParser:
                 params['maxX'] = element['max'][0]
                 params['maxY'] = element['max'][1]
                 params['maxZ'] = element['max'][2]
+            if self._config.projection_algorithm == 'isometric':
+                a = self.calculate_isometric_projection(x=element['center'][0], y=element['center'][1], z=element['center'][2])
+                params['projX'] = a[0]
+                params['projY'] = a[1]
+            if self._config.projection_algorithm == 'dimetric':
+                a = self.calculate_dimetric_projection(x=element['center'][0], y=element['center'][1], z=element['center'][2])
+                params['projX'] = a[0]
+                params['projY'] = a[1]
             params['regional'] = element['regional']
             params['security'] = element['security']
             params['securityClass'] = None

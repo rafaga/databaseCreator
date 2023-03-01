@@ -2,7 +2,7 @@
 /.pytest_cache
 /__pycache__
 /data.bin
-/smt.db
+/*.db
 /*.bz2
 /*.bz2.*
 /tranquilityDB-creator.code-workspace
