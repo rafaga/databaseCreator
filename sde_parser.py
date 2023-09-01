@@ -24,7 +24,10 @@ class SdeConfig:
     with_star_catalog = True
 
 
-class Data_Brigde():
+class DataBrigde():
+    """
+    Class for storing star type
+    """
     __star_group_id = 0
     __star_type_id = {}
 
@@ -45,6 +48,7 @@ class Data_Brigde():
 
     @property
     def star(self, type_id):
+        """ Property to to store start type """
         return self.__star_type_id[type_id]
 
     @star.setter
@@ -59,6 +63,9 @@ class DirectoryNotFoundError(Exception):
 
 
 class SdeParser:
+    """
+    Class that parse the data from SDE information
+    """
     # Propiedades
     _yaml_directory = None
     _db_driver = None
@@ -72,6 +79,7 @@ class SdeParser:
 
     @property
     def configuration(self):
+        """Object that stores the parsing configuration"""
         return self._config
 
     @property
@@ -94,19 +102,23 @@ class SdeParser:
         self._db_driver = DatabaseDriver(db_type, database_file)
         self._db_type = db_type
         self._config = SdeConfig()
- 
-    def calculate_isometric_projection(self, x, y, z):
-        """calculate isometric projection coordinates over 3D points"""
-        """ based upon https://www.compuphase.com/axometr.htm formulas """
-        n_x = x - z
-        n_y = y + ((x + z)/2)
+
+    def calculate_isometric_projection(self, x_coord, y_coord, z_coord):
+        """
+        calculate isometric projection coordinates over 3D points
+        based upon https://www.compuphase.com/axometr.htm formulas
+        Alternative Formula but not verified 
+        https://gamedev.stackexchange.com/questions/159434/how-to-convert-3d-coordinates-to-2d-isometric-coordinates
+        """
+        n_x = x_coord - z_coord
+        n_y = y_coord + ((x_coord + z_coord)/2)
         return ([n_x, n_y])
 
-    def calculate_dimetric_projection(self, x, y, z):
-        """calculate military oblique projection coordinates over 3D points"""
-        """ based upon https://www.compuphase.com/axometr.htm formulas """ 
-        n_x = x + (z / 4)
-        n_y = y + (z / 2)
+    def calculate_dimetric_projection(self, x_coord, y_coord, z_coord):
+        """calculate military oblique projection coordinates over 3D points
+           based upon https://www.compuphase.com/axometr.htm formulas """
+        n_x = x_coord + (z_coord / 4)
+        n_y = y_coord + (z_coord / 2)
         return ([n_x, n_y])
 
     def _read_directory(self, directory_path):
@@ -128,7 +140,7 @@ class SdeParser:
         This method prints a spinner on terminal screen (Not used)
         """
         print('[', end='')
-        calculated_value = (value % lenght)
+        calculated_value = value % lenght
         for character in range(0, width):
             if character >= calculated_value or character < calculated_value - lenght:
                 print('▉', end='')
@@ -212,8 +224,9 @@ class SdeParser:
             # Constelations - SQLite
             query = ('CREATE TABLE mapConstellations (constellationId INT NOT NULL PRIMARY KEY '
                      ',constellationName TEXT NOT NULL ,regionId INT NOT NULL REFERENCES '
-                     'mapRegions(regionId) ON UPDATE CASCADE ON DELETE SET NULL ,radius FLOAT NOT NULL '
-                     ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
+                     'mapRegions(regionId) ON UPDATE CASCADE ON DELETE SET NULL ,radius FLOAT '
+                     'NOT NULL ,centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,'
+                     'centerZ FLOAT NOT NULL ')
 
             if self._config.extended_coordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
@@ -388,7 +401,9 @@ class SdeParser:
     def _parse_types(self, path_object):
         cur = self._db_driver.connection.cursor()
         process = {}
-        query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId, published, volume) VALUES (:id ,:groupId, :name, :iconId, :published, :volume)')
+        query = ('INSERT INTO invTypes(typeId, groupId, typeName, iconId,'
+                 ' published, volume) VALUES (:id ,:groupId, :name, '
+                 ':iconId, :published, :volume)')
         with path_object.open(encoding='UTF-8') as file:
             yaml_types = yaml.safe_load(file)
             total = len(yaml_types)
@@ -411,7 +426,9 @@ class SdeParser:
                     cur.execute(query, params)
                     if params['groupId'] == self._stars.id:
                         parse_name = params['name'].split(' ')
-                        star_id = self.add_star_type(object_type[0],parse_name[1],parse_name[2][1:-1])
+                        star_id = self.add_star_type(object_type[0],
+                                                     parse_name[1],
+                                                     parse_name[2][1:-1])
                         self._stars.entity_type[object_type[0]]=star_id
                     cont += 1
                 print(f'SDE: parsing {total} Types [{round((cont / total)*100,2)}%]  \r', end="")
@@ -421,10 +438,10 @@ class SdeParser:
     def _parse_groups(self, path_object):
         cur = self._db_driver.connection.cursor()
         with path_object.open(encoding='UTF-8') as file:
-            yGroups = yaml.safe_load(file)
-            total = len(yGroups)
+            y_groups = yaml.safe_load(file)
+            total = len(y_groups)
             cont = 0
-            for group in yGroups.items():
+            for group in y_groups.items():
                 params = {}
                 query = ('INSERT INTO invGroups(groupId, categoryId, groupName, anchorable) '
                          'VALUES (:id ,:catId, :name, :anchor)')
@@ -446,10 +463,10 @@ class SdeParser:
     def _parse_categories(self, path_object):
         cur = self._db_driver.connection.cursor()
         with path_object.open(encoding='UTF-8') as file:
-            yCategories = yaml.safe_load(file)
-            total = len(yCategories)
+            y_categories = yaml.safe_load(file)
+            total = len(y_categories)
             cont = 0
-            for category in yCategories.items():
+            for category in y_categories.items():
                 params = {}
                 query = ('INSERT INTO invCategories(categoryId, categoryName,'
                          ' published) VALUES (:id ,:name, :publish)')
@@ -457,7 +474,8 @@ class SdeParser:
                 params['name'] = category[1]["name"]["en"]
                 params['publish'] = category[1]["published"]
                 cont += 1
-                print(f'SDE: parsing {total} categories [{round((cont / total)*100,2)}%]  \r', end="")
+                print(f'SDE: parsing {total} categories [{round((cont / total)*100,2)}%]  \r',
+                      end="")
                 cur.execute(query, params)
             print(f'SDE: {total} Categories parsed          ')
         cur.close()
@@ -472,13 +490,16 @@ class SdeParser:
                  ',centerY ,centerZ ,regional ,security ,securityClass ')
         if self._config.extended_coordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ '
-        if self._config.projection_algorithm == 'isometric' or self._config.projection_algorithm == 'dimetric':
+        if (self._config.projection_algorithm == 'isometric' or
+            self._config.projection_algorithm == 'dimetric'):
             query += ',projX ,projY '
-        query += (') VALUES ( :id, :name, :constellationId, :corridor, :fringe, :hub, :international, '
-                  ':luminosity, :radius, :centerX, :centerY, :centerZ, :regional, :security, :securityClass')
+        query += (') VALUES ( :id, :name, :constellationId, :corridor, :fringe, :hub, '
+                  ':international, :luminosity, :radius, :centerX, :centerY, :centerZ, '
+                  ':regional, :security, :securityClass')
         if self._config.extended_coordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ '
-        if self._config.projection_algorithm == 'isometric' or self._config.projection_algorithm == 'dimetric':
+        if (self._config.projection_algorithm == 'isometric' or
+            self._config.projection_algorithm == 'dimetric'):
             query += ',:projX ,:projY '
         query += ');'
 
@@ -489,8 +510,8 @@ class SdeParser:
             self._Location[self._counter]['id'] = element['solarSystemID']
             self._Location[self._counter]['name'] = self._get_name(element['solarSystemID'])
             # print('SDE: parsing data for system ' + self._Location[self._counter]["name"])
-            print(f'SDE: Parsing {self._Location[0]["name"]} > {self._Location[1]["name"]} > {self._Location[2]["name"]}')
-
+            print(f'SDE: Parsing {self._Location[0]["name"]} > '
+                   '{self._Location[1]["name"]} > {self._Location[2]["name"]}')
             params['id'] = element['solarSystemID']
             params['name'] = self._Location[self._counter]['name']
             params['constellationId'] = self._Location[1]['id']
@@ -511,13 +532,17 @@ class SdeParser:
                 params['maxY'] = element['max'][1]
                 params['maxZ'] = element['max'][2]
             if self._config.projection_algorithm == 'isometric':
-                a = self.calculate_isometric_projection(x=element['center'][0], y=element['center'][1], z=element['center'][2])
-                params['projX'] = a[0]
-                params['projY'] = a[1]
+                projection = self.calculate_isometric_projection(x_coord=element['center'][0],
+                                                                 y_coord=element['center'][1],
+                                                                 z_coord=element['center'][2])
+                params['projX'] = projection[0]
+                params['projY'] = projection[1]
             if self._config.projection_algorithm == 'dimetric':
-                a = self.calculate_dimetric_projection(x=element['center'][0], y=element['center'][1], z=element['center'][2])
-                params['projX'] = a[0]
-                params['projY'] = a[1]
+                projection = self.calculate_dimetric_projection(x_coord=element['center'][0],
+                                                                y_coord=element['center'][1],
+                                                                z_coord=element['center'][2])
+                params['projX'] = projection[0]
+                params['projY'] = projection[1]
             params['regional'] = element['regional']
             params['security'] = element['security']
             params['securityClass'] = None
@@ -527,14 +552,15 @@ class SdeParser:
 
             self._parse_gates(element['stargates'])
             self._parse_planets(element['planets'])
-            self._parse_star(element['star'])
+            if element.get('star'):
+                self._parse_star(element['star'])
         cur.close()
 
     def _parse_constellation(self, path_object):
         cur = self._db_driver.connection.cursor()
         # query creation
-        query = ('INSERT INTO mapConstellations (constellationId ,constellationName ,regionId ,radius '
-                 ',centerX ,centerY ,centerZ ')
+        query = ('INSERT INTO mapConstellations (constellationId ,constellationName ,regionId '
+                 ' ,radius ,centerX ,centerY ,centerZ ')
         if self._config.extended_coordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ'
         query += ') VALUES (:id ,:name ,:regionId ,:radius ,:centerX ,:centerY ,:centerZ '
@@ -574,7 +600,8 @@ class SdeParser:
                  ',nebula ,wormholeClassId ')
         if self._config.extended_coordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ'
-        query += ') VALUES (:id , :name, :factionId, :centerX, :centerY, :centerZ, :nebula, :whclass'
+        query += (') VALUES (:id , :name, :factionId, :centerX, :centerY, :centerZ, :nebula, '
+                  ':whclass')
         if self._config.extended_coordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ'
         query += ')'
@@ -630,9 +657,9 @@ class SdeParser:
     def _parse_moons(self, planet_id, node):
         cur = self._db_driver.connection.cursor()
         cont = 1
-        query = ('INSERT INTO mapMoons (moonId, solarSystemId, moonIndex, planetId, typeid, radius, positionX, '
-                 'positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, :planetId ,:typeId, :radius, '
-                 ':posX, :posY, :posZ );')
+        query = ('INSERT INTO mapMoons (moonId, solarSystemId, moonIndex, planetId, typeid, radius,'
+                 ' positionX, positionY, positionZ) VALUES (:id, :solarSystemId, :moonIndex, '
+                 ':planetId ,:typeId, :radius, :posX, :posY, :posZ );')
         for element in node.items():
             params = {}
             params['id'] = element[0]
