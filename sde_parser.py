@@ -510,8 +510,7 @@ class SdeParser:
             self._Location[self._counter]['id'] = element['solarSystemID']
             self._Location[self._counter]['name'] = self._get_name(element['solarSystemID'])
             # print('SDE: parsing data for system ' + self._Location[self._counter]["name"])
-            print(f'SDE: Parsing {self._Location[0]["name"]} > '
-                   '{self._Location[1]["name"]} > {self._Location[2]["name"]}')
+            print(f'SDE: Parsing {self._Location[0]["name"]} > {self._Location[1]["name"]} > {self._Location[2]["name"]}')
             params['id'] = element['solarSystemID']
             params['name'] = self._Location[self._counter]['name']
             params['constellationId'] = self._Location[1]['id']
@@ -552,8 +551,7 @@ class SdeParser:
 
             self._parse_gates(element['stargates'])
             self._parse_planets(element['planets'])
-            if element.get('star'):
-                self._parse_star(element['star'])
+            self._parse_star(element['star'])
         cur.close()
 
     def _parse_constellation(self, path_object):

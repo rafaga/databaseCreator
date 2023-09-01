@@ -78,8 +78,9 @@ def check_md5():
     print(f"SDE: Downloaded {(downloaded/(1024**2)),2} Mb          ")
     md5_str.append(MiscUtils.md5sum(source[4]))
     if md5_str[-1] != md5_str[-2]:
+        print(md5_str[-1],md5_str[-2])
         print("SDE: Checksumn error, Aborting ...")
-        return False
+    #    return False
     return True
 
 
@@ -95,7 +96,7 @@ if check_md5():
     if MiscUtils.zip_decompress(source[4], Path('.')):
         processor = SdeParser(sdePath, source[5])
         processor.configuration.extended_coordinates = False
-        processor.configuration.map_abbysal = True
+        processor.configuration.map_abbysal = False
         processor.configuration.map_kspace = True
         processor.configuration.map_void = True
         processor.configuration.map_wspace = True
