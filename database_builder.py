@@ -96,7 +96,7 @@ if check_md5():
     if MiscUtils.zip_decompress(source[4], Path('.')):
         processor = SdeParser(sdePath, source[5])
         processor.configuration.extended_coordinates = False
-        processor.configuration.map_abbysal = False
+        processor.configuration.map_abbysal = True
         processor.configuration.map_kspace = True
         processor.configuration.map_void = True
         processor.configuration.map_wspace = True

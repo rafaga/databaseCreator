@@ -3,6 +3,7 @@
 """ This script provides a Class to parse SDE structure into a SQLite Database"""
 from pathlib import Path
 import yaml
+import sys
 from database_driver import DatabaseDriver, DatabaseType
 from data_object import GenericEntity
 
@@ -17,11 +18,8 @@ class SdeConfig:
     map_abbysal = True
     map_void = False
     projection_algorithm='isometric' # posibles values are 'isometric' and 'dimetric'
-
-    # TODO: implement these flags, these flags depend upon map Flags.
     with_moons = True
     with_gates = True
-    with_star_catalog = True
 
 
 class DataBrigde():
@@ -124,6 +122,9 @@ class SdeParser:
     def _read_directory(self, directory_path):
         for element in directory_path.iterdir():
             if element.is_dir():
+                # this variable stores the mminimum cand maximum coordinates for all systems in the region
+                # using the selected projection, for mapping propourses
+                region_coords = [sys.float_info.max, sys.float_info.max, sys.float_info.min, sys.float_info.min]
                 self._counter += 1
                 if self._counter == 0:
                     self._parse_region(element.joinpath('region.staticdata'))
@@ -132,7 +133,7 @@ class SdeParser:
                 self._read_directory(element)
                 self._counter -= 1
             if element.is_file() and element.name == "solarsystem.staticdata":
-                self._parse_solar_system(element)
+                self._parse_solar_system(element, region_coords)
 
     # Not used for now
     def spinner(self, value, lenght=3, width=7, message=None):
@@ -212,8 +213,9 @@ class SdeParser:
             query = ('CREATE TABLE mapRegions (regionId INT NOT NULL PRIMARY KEY'
                      ',regionName TEXT NOT NULL, nebula INT NOT NULL, wormholeClassId INT '
                      ',factionId INT REFERENCES factions(factionId) ON UPDATE CASCADE '
-                     'ON DELETE SET NULL '
-                     ',centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL ,centerZ FLOAT NOT NULL ')
+                     'ON DELETE SET NULL ,centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL, '
+                     'centerZ FLOAT NOT NULL, maxProjX FLOAT NOT NULL DEFAULT(0.0), '
+                     'maxProjY FLOAT NOT NULL DEFAULT(0.0) ')
 
             if self._config.extended_coordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
@@ -549,9 +551,13 @@ class SdeParser:
                 params['securityClass'] = element['securityClass']
             cur.execute(query, params)
 
-            self._parse_gates(element['stargates'])
-            self._parse_planets(element['planets'])
-            self._parse_star(element['star'])
+            # avoiding parsing gates, stars and planets for systems that doesn't have it
+            if (params['id'] < 12000000 and params['id'] >= 13000000
+                and params['id'] < 14000000 and params['id'] >= 15000000):
+                if self.configuration.with_gates:
+                    self._parse_gates(element['stargates'])
+                self._parse_planets(element['planets'])
+                self._parse_star(element['star'])
         cur.close()
 
     def _parse_constellation(self, path_object):
@@ -695,7 +701,7 @@ class SdeParser:
             params['posY'] = element[1]['position'][1]
             params['posZ'] = element[1]['position'][2]
             cur.execute(query, params)
-            if 'moons' in element[1]:
+            if 'moons' in element[1] and self.configuration.with_moons:
                 self._parse_moons(element[0], element[1]['moons'])
         cur.close()
 
