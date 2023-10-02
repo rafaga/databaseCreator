@@ -3,7 +3,6 @@
 """ This script provides a Class to parse SDE structure into a SQLite Database"""
 from pathlib import Path
 import yaml
-import sys
 from database_driver import DatabaseDriver, DatabaseType
 from data_object import GenericEntity
 
@@ -121,7 +120,7 @@ class SdeParser:
 
     def _read_directory(self, directory_path):
         for element in directory_path.iterdir():
-            if element.is_dir():    
+            if element.is_dir():
                 self._counter += 1
                 if self._counter == 0:
                     self._parse_region(element.joinpath('region.staticdata'))
@@ -549,8 +548,7 @@ class SdeParser:
             cur.execute(query, params)
 
             # avoiding parsing gates, stars and planets for systems that doesn't have it
-            if (params['id'] < 12000000 and params['id'] >= 13000000
-                and params['id'] < 14000000 and params['id'] >= 15000000):
+            if params['id'] < 32000000 or ( params['id'] >= 33000000  and params['id'] < 34000000) or params['id'] >= 35000000:
                 if self.configuration.with_gates:
                     self._parse_gates(element['stargates'])
                 self._parse_planets(element['planets'])
