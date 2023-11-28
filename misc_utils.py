@@ -6,10 +6,10 @@ decompress files from internet
 from pathlib import Path
 import zipfile
 import bz2
-import requests
-import classutilities
 import hashlib
 from functools import partial
+import classutilities
+import requests
 
 
 class MiscUtils(object):
@@ -39,22 +39,26 @@ class MiscUtils(object):
         else:
             # TODO: implement a way to discard any no-esscential parameter from url
             file_path = url.split('/')[-1]
-        request_obj = requests.get(url, stream=True, timeout=500)
-        with open(file_path, "wb") as zip_file:
-            total_length = 0
-            bytes_downloaded = 0
-            downloaded_percent = "--"
-            if request_obj.headers.get('content-length') is not None:
-                total_length = int(request_obj.headers.get('content-length'))
-            for chunk in request_obj.iter_content(cls.chunk_size):
-                if chunk:
-                    zip_file.write(chunk)
-                    bytes_downloaded += len(chunk)
-                    downloaded_kb = round(bytes_downloaded / 1024)
-                    if total_length > 0:
-                        downloaded_percent = round((bytes_downloaded / total_length) * 100, 2)
-                    print(f'Downloading: {downloaded_kb} kb [{downloaded_percent}%]\r', end="")
-        return bytes_downloaded
+        # check if URL exists
+        r = requests.head(url, allow_redirects=True, timeout=500)
+        if r.status_code == 200:
+            request_obj = requests.get(url, stream=True, timeout=500)
+            with open(file_path, "wb") as zip_file:
+                total_length = 0
+                bytes_downloaded = 0
+                downloaded_percent = "--"
+                if request_obj.headers.get('content-length') is not None:
+                    total_length = int(request_obj.headers.get('content-length'))
+                for chunk in request_obj.iter_content(cls.chunk_size):
+                    if chunk:
+                        zip_file.write(chunk)
+                        bytes_downloaded += len(chunk)
+                        downloaded_kb = round(bytes_downloaded / 1024)
+                        if total_length > 0:
+                            downloaded_percent = round((bytes_downloaded / total_length) * 100, 2)
+                        print(f'Downloading: {downloaded_kb} kb [{downloaded_percent}%]\r', end="")
+            return bytes_downloaded
+        return 0
 
     @classmethod
     def bz2_decompress(cls, compressed_filepath, uncompressed_filepath):
@@ -92,7 +96,7 @@ class MiscUtils(object):
                 return True
         except zipfile.BadZipFile:
             return False
-        
+
     @classmethod
     def md5sum(cls, filename):
         """
