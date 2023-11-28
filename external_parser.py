@@ -182,7 +182,7 @@ class ExternalParser():
                 ' BOOL NOT NULL DEFAULT 0;')
         cur.execute(query)
 
-        query = ('CREATE INDEX joveSystems ON mapSolarSystems (solarSystemId, joveObservatory);')
+        query = 'CREATE INDEX joveSystems ON mapSolarSystems (solarSystemId, joveObservatory);'
         cur.execute(query)
 
         # updating Jove Systems Part 1
@@ -442,7 +442,7 @@ class ExternalParser():
             file_size = 0
             map_filepath = Path(self.data_directory).joinpath(str(region[0]) + '.svg')
             if not map_filepath.exists():
-                map_url = self.map_url + region[1].replace(' ', '_') + ".svg"
+                map_url = self._map_url + region[1].replace(' ', '_') + ".svg"
                 urlparse(map_url)
                 file_size = MiscUtils.download_file(map_url, "maps/" + str(region[0]) + ".svg")
                 if file_size <= 100:
