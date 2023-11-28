@@ -112,7 +112,7 @@ class ExternalParser():
                     '30010141,30005029,30003495)')
 
         # Adding Fortress Systems
-        cur.execute('UPDATE mapSolarSystems SET trigStatusID=3 WHERE ''solarSystemID IN ('
+        cur.execute('UPDATE mapSolarSystems SET trigStatusID=3 WHERE solarSystemID IN ('
                     '30003539,30003573,30005251,30004103,30000118,30004090,'
                     '30003548,30000113,30002386,30004973,30002266,30002530,'
                     '30004141,30002253,30003398,30003490,30003556,30002385,'
@@ -187,7 +187,8 @@ class ExternalParser():
         cur.execute(query)
 
         # updating Jove Systems Part 1
-
+        # TODO: substitute this for static file parsing
+        # http://schildwall.phbv3.de/ajax/tables-content/drifters.txt
         query = ('UPDATE mapSolarSystems SET joveObservatory=1 WHERE solarSystemName IN ('
                  '"0-4VQL","0-ARFO","0-G8NO","0-U2M4","0-VG7A","0-WVQS","0-XIDJ","01TG-J",'
                  '"08S-39","0D-CHA","0LTQ-C","0LY-W1","0MV-4W","0P-U0Q","12YA-2","15U-JY",'
@@ -344,8 +345,6 @@ class ExternalParser():
         if self.configuration.with_jove_observatories:
             self.create_jove_observatories()
 
-        # TODO: Add query to add A0 Star Solar systems as special
-        # mineral anomalies
         print('SMT: Adding the Ducinium, Eifyrium, '
               'Mordunium and Ytirium Systems')
         if self.configuration.with_special_ore:
@@ -369,6 +368,12 @@ class ExternalParser():
     def _extract_map_data(self, map_filename):
         """Function that serach all the icebetls and abstract coordinates
         in the dotlan maps and updates its status in Database"""
+
+        map_file = Path(map_filename)
+        if not map_file.exists():
+            print("file not found ... skiping parsing")
+            return
+
         e_tree = xml.etree.ElementTree.ElementTree()
         root = e_tree.parse(source=map_filename)
         solar_system_ids = []

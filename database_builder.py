@@ -104,6 +104,7 @@ if check_md5():
         processor.parse_data()
         processor.close()
         eParser = ExternalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
+        eParser.map_url = MAPS_URL
         eParser.configuration.with_icebelts = True
         eParser.configuration.with_triglavian_status = True
         eParser.configuration.with_jove_observatories = True
