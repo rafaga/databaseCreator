@@ -58,6 +58,7 @@ class ExternalParser():
             print("Misc: Using SQLite as Database Engine...")
         self._db_driver = DatabaseDriver(db_type, database_file)
         self._db_type = db_type
+        self._map_url = None
 
     def create_triglavian(self):
         """
