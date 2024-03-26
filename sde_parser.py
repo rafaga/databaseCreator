@@ -16,7 +16,7 @@ class SdeConfig:
     map_wspace = True
     map_abbysal = True
     map_void = False
-    projection_algorithm='isometric' # posibles values are 'isometric' and 'dimetric'
+    projection_algorithm='None' # posibles values are 'isometric' and 'dimetric'
     with_moons = True
     with_gates = True
 
@@ -276,6 +276,14 @@ class SdeParser:
                      'ON CONFLICT FAIL );')
             cur.execute(query)
 
+            # Implementing simplified SystemGates
+            query = ('CREATE TABLE mapSystemConnections (systemConnectionId CHAR(8) PRIMARY KEY,'
+                     'systemA INTEGER NOT NULL REFERENCES mapSolarSystems' 
+                     '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL,'
+                     'systemB INTEGER NOT NULL REFERENCES mapSolarSystems'
+                     '(solarSystemId) ON UPDATE CASCADE ON DELETE SET NULL);')
+            cur.execute(query)
+
             # Planets - SQLite (typeId here)
             query = ('CREATE TABLE mapPlanets (planetId INT NOT NULL '
                      'PRIMARY KEY,solarSystemId INTEGER REFERENCES '
@@ -381,6 +389,7 @@ class SdeParser:
         if self._config.map_void:
             print('SDE: parsing Void Systems')
             self._read_directory(universe_dir.joinpath('void'))
+        self.parse_connections()
 
     def add_star_type(self,type_id, name, color):
         """
@@ -534,12 +543,15 @@ class SdeParser:
                                                                  z_coord=element['center'][2])
                 params['projX'] = projection[0]
                 params['projY'] = projection[1]
-            if self._config.projection_algorithm == 'dimetric':
+            elif self._config.projection_algorithm == 'dimetric':
                 projection = self.calculate_dimetric_projection(x_coord=element['center'][0],
                                                                 y_coord=element['center'][1],
                                                                 z_coord=element['center'][2])
                 params['projX'] = projection[0]
                 params['projY'] = projection[1]
+            else:
+                params['projX'] = element['center'][0]
+                params['projY'] = element['center'][1]
             params['regional'] = element['regional']
             params['security'] = element['security']
             params['securityClass'] = None
@@ -651,6 +663,16 @@ class SdeParser:
             params['posZ'] = element[1]['position'][2]
             params['destination'] = element[1]['destination']
             cur.execute(query, params)
+        cur.close()
+
+    def parse_connections(self):
+        cur = self._db_driver.connection.cursor()
+        query = ('INSERT INTO mapSystemConnections AS msc (systemConnectionId, systemA, systemB)'
+                'SELECT LOWER(HEX(RANDOMBLOB(8))), msga.solarSystemId, msgb.solarSystemId '
+                'FROM mapSystemGates AS msga '
+                'INNER JOIN mapSystemGates AS msgb ON(msgb.systemGateId = msga.destination) '
+                'WHERE msga.solarsystemId > msgb.solarsystemId')
+        cur.execute(query)
         cur.close()
 
     def _parse_moons(self, planet_id, node):
