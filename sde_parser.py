@@ -16,7 +16,8 @@ class SdeConfig:
     map_wspace = True
     map_abbysal = True
     map_void = False
-    projection_algorithm='None' # posibles values are 'isometric' and 'dimetric'
+    projection_algorithm = 'isometric' # posibles values are 'isometric' and 'dimetric'
+    projected_axis = 1 # 0 for X axis , 1 for Y and 2 for Z
     with_moons = True
     with_gates = True
 
@@ -100,23 +101,41 @@ class SdeParser:
         self._db_type = db_type
         self._config = SdeConfig()
 
-    def calculate_isometric_projection(self, x_coord, y_coord, z_coord):
+    def calculate_isometric_projection(self, x_coord, y_coord, z_coord, projected_axis):
         """
         calculate isometric projection coordinates over 3D points
         based upon https://www.compuphase.com/axometr.htm formulas
         Alternative Formula but not verified 
         https://gamedev.stackexchange.com/questions/159434/how-to-convert-3d-coordinates-to-2d-isometric-coordinates
         """
-        n_x = x_coord - z_coord
-        n_y = y_coord + ((x_coord + z_coord)/2)
-        return ([n_x, n_y])
+        n = [0.0,0.0,0.0]
+        if projected_axis == 2:
+            n[0] = x_coord - z_coord
+            n[1] = y_coord + ((x_coord + z_coord)/2)
+        if projected_axis == 1:
+            n[0] = x_coord - y_coord
+            n[2] = z_coord + ((x_coord + y_coord)/2)
+        if projected_axis == 0:
+            n[1] = y_coord - x_coord
+            n[2] = z_coord + ((y_coord + x_coord)/2)
+        return (n)
 
-    def calculate_dimetric_projection(self, x_coord, y_coord, z_coord):
-        """calculate military oblique projection coordinates over 3D points
-           based upon https://www.compuphase.com/axometr.htm formulas """
-        n_x = x_coord + (z_coord / 4)
-        n_y = y_coord + (z_coord / 2)
-        return ([n_x, n_y])
+    def calculate_dimetric_projection(self, x_coord, y_coord, z_coord, projected_axis):
+        """
+        calculate military oblique projection coordinates over 3D points
+        based upon https://www.compuphase.com/axometr.htm formulas 
+        """
+        n = [0.0,0.0,0.0]
+        if projected_axis == 2:
+            n[0] = x_coord + (z_coord / 4)
+            n[1] = y_coord + (z_coord / 2)
+        if projected_axis == 1:
+            n[0] = x_coord + (y_coord / 4)
+            n[2] = z_coord + (y_coord / 2)
+        if projected_axis == 0:
+            n[1] = y_coord + (x_coord / 4)
+            n[2] = z_coord + (x_coord / 2)  
+        return (n)
 
     def _read_directory(self, directory_path):
         for element in directory_path.iterdir():
@@ -240,7 +259,7 @@ class SdeParser:
                      ',international BOOL NOT NULL ,luminosity FLOAT NOT NULL '
                      ',radius FLOAT NOT NULL ,centerX FLOAT NOT NULL ,centerY FLOAT NOT NULL '
                      ',centerZ FLOAT NOT NULL, projX FLOAT NOT NULL DEFAULT(0.0) '
-                     ',projY FLOAT NOT NULL DEFAULT(0.0) ')
+                     ',projY FLOAT NOT NULL DEFAULT(0.0), projZ FLOAT NOT NULL DEFAULT(0.0) ')
 
             if self._config.extended_coordinates:
                 query += (',maxX FLOAT NOT NULL ,maxY FLOAT NOT NULL ,maxZ FLOAT NOT NULL '
@@ -497,18 +516,13 @@ class SdeParser:
                  ',centerY ,centerZ ,regional ,security ,securityClass ')
         if self._config.extended_coordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ '
-        if (self._config.projection_algorithm == 'isometric' or
-            self._config.projection_algorithm == 'dimetric'):
-            query += ',projX ,projY '
+        query += ',projX ,projY ,projZ '
         query += (') VALUES ( :id, :name, :constellationId, :corridor, :fringe, :hub, '
                   ':international, :luminosity, :radius, :centerX, :centerY, :centerZ, '
                   ':regional, :security, :securityClass')
         if self._config.extended_coordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ '
-        if (self._config.projection_algorithm == 'isometric' or
-            self._config.projection_algorithm == 'dimetric'):
-            query += ',:projX ,:projY '
-        query += ');'
+        query += ',:projX ,:projY ,:projZ );'
 
         with path_object.open(encoding='UTF-8') as file:
             element = yaml.safe_load(file)
@@ -540,18 +554,23 @@ class SdeParser:
             if self._config.projection_algorithm == 'isometric':
                 projection = self.calculate_isometric_projection(x_coord=element['center'][0],
                                                                  y_coord=element['center'][1],
-                                                                 z_coord=element['center'][2])
+                                                                 z_coord=element['center'][2],
+                                                                 projected_axis=self.projected_axis)
                 params['projX'] = projection[0]
                 params['projY'] = projection[1]
+                params['projZ'] = projection[2]
             elif self._config.projection_algorithm == 'dimetric':
                 projection = self.calculate_dimetric_projection(x_coord=element['center'][0],
                                                                 y_coord=element['center'][1],
-                                                                z_coord=element['center'][2])
+                                                                z_coord=element['center'][2],
+                                                                projected_axis=self.projected_axis)
                 params['projX'] = projection[0]
                 params['projY'] = projection[1]
+                params['projZ'] = projection[2]
             else:
                 params['projX'] = element['center'][0]
                 params['projY'] = element['center'][1]
+                params['projZ'] = element['center'][2]
             params['regional'] = element['regional']
             params['security'] = element['security']
             params['securityClass'] = None

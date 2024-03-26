@@ -95,6 +95,8 @@ if check_md5():
     # decompressing the database
     if MiscUtils.zip_decompress(source[4], Path('.')):
         processor = SdeParser(sdePath, source[5])
+        processor.configuration.projection_algorithm = 'isometric' #values are isometric, dimetric and none
+        processor.configuration.projected_axis = 1 # value range 0-X, 1-Y, 2-Z
         processor.configuration.extended_coordinates = False
         processor.configuration.map_abbysal = True
         processor.configuration.map_kspace = True
