@@ -497,17 +497,13 @@ class SdeParser:
                  ',centerY ,centerZ ,regional ,security ,securityClass ')
         if self._config.extended_coordinates:
             query += ',maxX ,maxY ,maxZ ,minX ,minY ,minZ '
-        if (self._config.projection_algorithm == 'isometric' or
-            self._config.projection_algorithm == 'dimetric'):
-            query += ',projX ,projY '
+        query += ',projX ,projY '
         query += (') VALUES ( :id, :name, :constellationId, :corridor, :fringe, :hub, '
                   ':international, :luminosity, :radius, :centerX, :centerY, :centerZ, '
                   ':regional, :security, :securityClass')
         if self._config.extended_coordinates:
             query += ',:maxX ,:maxY ,:maxZ ,:minX ,:minY ,:minZ '
-        if (self._config.projection_algorithm == 'isometric' or
-            self._config.projection_algorithm == 'dimetric'):
-            query += ',:projX ,:projY '
+        query += ',:projX ,:projY '
         query += ');'
 
         with path_object.open(encoding='UTF-8') as file:
