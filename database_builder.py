@@ -102,6 +102,7 @@ if check_md5():
         processor.configuration.map_kspace = True
         processor.configuration.map_void = True
         processor.configuration.map_wspace = True
+        processor.configuration.projection_algorithm = 'isometric' # values are 'isometric' and 'dimetric'
         processor.create_table_structure()
         processor.parse_data()
         processor.close()
