@@ -555,7 +555,7 @@ class SdeParser:
                 projection = self.calculate_isometric_projection(x_coord=element['center'][0],
                                                                  y_coord=element['center'][1],
                                                                  z_coord=element['center'][2],
-                                                                 projected_axis=self.projected_axis)
+                                                                 projected_axis=self._config.projected_axis)
                 params['projX'] = projection[0]
                 params['projY'] = projection[1]
                 params['projZ'] = projection[2]
@@ -563,7 +563,7 @@ class SdeParser:
                 projection = self.calculate_dimetric_projection(x_coord=element['center'][0],
                                                                 y_coord=element['center'][1],
                                                                 z_coord=element['center'][2],
-                                                                projected_axis=self.projected_axis)
+                                                                projected_axis=self._config.projected_axis)
                 params['projX'] = projection[0]
                 params['projY'] = projection[1]
                 params['projZ'] = projection[2]
