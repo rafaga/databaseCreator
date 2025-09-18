@@ -8,7 +8,8 @@
 /tranquilityDB-creator.code-workspace
 /*-journal
 /maps/*.svg
-/sde/
+/sde/*
+/data/*
 /sde.zip
 /checksum
 /sde.md5

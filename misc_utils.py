@@ -58,7 +58,7 @@ class MiscUtils(object):
                             downloaded_percent = round((bytes_downloaded / total_length) * 100, 2)
                         print(f'Downloading: {downloaded_kb} kb [{downloaded_percent}%]\r', end="")
             return bytes_downloaded
-        return 0
+        return None
 
     @classmethod
     def bz2_decompress(cls, compressed_filepath, uncompressed_filepath):

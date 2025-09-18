@@ -446,11 +446,11 @@ class ExternalParser():
         eve_regions = self.get_all_regions()
         for region in eve_regions:
             file_size = 0
-            map_filepath = Path(self.data_directory).joinpath(str(region[0]) + '.svg')
+            map_filepath = Path(self.data_directory).joinpath(str(region[1]).replace(' ', '_') + '.svg')
             if not map_filepath.exists():
                 map_url = self.map_url + region[1].replace(' ', '_') + ".svg"
                 urlparse(map_url)
-                file_size = MiscUtils.download_file(map_url, "maps/" + str(region[0]) + ".svg")
+                file_size = MiscUtils.download_file(map_url, "maps/" + str(region[1]).replace(' ', '_') + ".svg")
                 if file_size <= 100:
                     map_filepath.unlink()
                     print("Dotlan: Invalid data was recieved for " + region[1])

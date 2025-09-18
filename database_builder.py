@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 """
 This script download the EVE online's Tranquility Server
-Database and discard all the non-escential data
+Database and discard all the non-essential data
 """
 from pathlib import Path
 import shutil
@@ -18,16 +18,10 @@ SDE_FILENAME = 'sde.zip'
 SDE_CHECKSUM = 'checksum'
 OUT_FILENAME = 'sde.db'
 MD5_CHECKSUM = ''
+data_resources = ['fsd','bsd','universe']
 MiscUtils.chunk_size = 2391975
 
-source = []
-source.append(Path('.').joinpath('checksum'))
-source.append(Path('.').joinpath('sde.md5'))
-source.append(SDE_URL + SDE_CHECKSUM)
-source.append(SDE_URL + SDE_FILENAME)
-source.append(Path('.').joinpath(SDE_FILENAME))
-source.append(Path('.').joinpath(OUT_FILENAME))
-
+changes = []
 
 def download_control(file_name, retries=3):
     """
@@ -44,72 +38,78 @@ def download_control(file_name, retries=3):
             transfer_try += 1
             print(f'Transfer timeout, Retrying ({transfer_try}/{retries})')
     if transfer_try == retries:
-        print('Maximum retries exceded, aborting...')
+        print('Maximum retries exceeded, aborting...')
     return bytes_downloaded
 
+def update_as_needed(resource_name):
+    md5 = []
+    files = [resource_name + ".zip.checksum",resource_name + ".zip.checksum.bak", resource_name + ".zip"]
+    md5_file = Path('.').joinpath('data').joinpath(files[0])
+    bak_file = Path('.').joinpath('data').joinpath(files[1])
+    zip_file = Path('.').joinpath('data').joinpath(files[2])
+    md5_url = SDE_URL + files[0]
+    zip_url = SDE_URL + files[2]
 
-def check_md5():
-    """
-    Method that download and verify SDE downloads
-    """
-    md5_str = []
-    if source[0].exists():
-        print('SDE: deleting old incomplete checksum')
-        source[0].unlink()
-    print('SDE: Downloading MD5 Checksum ...')
-    downloaded = download_control(source[2])
-    print(f"SDE: Downloaded {downloaded} bytes          ")
-    for cont in range(0, 2):
-        if Path(source[cont]).exists():
-            with open(source[cont], 'rt', encoding='UTF-8') as md5_file:
-                md5_str.append(md5_file.read())
-    if len(md5_str) > 1:
-        if md5_str[0] == md5_str[1]:
-            print("SDE: The database it is already updated")
-            return True
-    print("SDE: a new version has been detected, proceding to download")
-    if source[1].exists():
-        source[1].unlink()
-        source[0].rename(source[1])
-    if source[4].exists():
-        source[4].unlink()
-    print('SDE: Downloading SDE database ...')
-    downloaded = download_control(source[3])
-    print(f"SDE: Downloaded {(downloaded/(1024**2)),2} Mb          ")
-    md5_str.append(MiscUtils.md5sum(source[4]))
-    if md5_str[-1] != md5_str[-2]:
-        print(md5_str[-1],md5_str[-2])
-        print("SDE: Checksumn error, Aborting ...")
-    #    return False
-    return True
+    if md5_file.exists():
+        md5_file.unlink()
+    downloaded_data = download_control(md5_url)
 
+    if downloaded_data is not None:
+        shutil.move(Path('.').joinpath(files[0]),md5_file)
+        with open(md5_file, 'rt', encoding="UTF-8") as file:
+            md5.append(file.read())
+    else:
+        print('SDE: ' + md5_url + ' data not found')
+        md5.append('')
+    if bak_file.exists():
+        with open(bak_file, 'rt', encoding="UTF-8") as file:
+            md5.append(file.read())
+    else:
+        md5.append('')
 
-if check_md5():
-    # we delete the uncompessed directory
-    sdePath = Path('.').joinpath('sde')
-    if sdePath.exists():
-        shutil.rmtree(sdePath)
-    if source[5].exists():
-        source[5].unlink()
+    if md5[0] != md5[1] and len(md5[1]) > 0 or not zip_file.exists():
+        print('SDE: Inconsistencies found for ' + resource_name + ' data')
+        if zip_file.exists():
+            zip_file.unlink()
+        print('SDE: Downloading ' + resource_name + ' data ')
+        if download_control(zip_url) is not None:
+            shutil.move(Path('.').joinpath(files[2]),zip_file)
+        shutil.copyfile(md5_file,bak_file)
+        return True
+    else:
+        print('SDE: ' + resource_name + ' its already updated')
+    return False
+    
 
-    # decompressing the database
-    if MiscUtils.zip_decompress(source[4], Path('.')):
-        processor = SdeParser(sdePath, source[5])
-        processor.configuration.projection_algorithm = 'isometric' #values are isometric, dimetric and none
-        processor.configuration.projected_axis = 1 # value range 0-X, 1-Y, 2-Z
-        processor.configuration.extended_coordinates = False
-        processor.configuration.map_abbysal = True
-        processor.configuration.map_kspace = True
-        processor.configuration.map_void = True
-        processor.configuration.map_wspace = True
-        processor.configuration.projection_algorithm = 'isometric' # values are 'isometric' and 'dimetric'
-        processor.create_table_structure()
-        processor.parse_data()
-        processor.close()
-        eParser = ExternalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
-        eParser.map_url = MAPS_URL
-        eParser.configuration.with_icebelts = True
-        eParser.configuration.with_triglavian_status = True
-        eParser.configuration.with_jove_observatories = True
-        eParser.configuration.with_special_ore = True
-        eParser.process()
+for idx in range(3):
+    changes.append(update_as_needed(data_resources[idx]))
+    if changes[idx]:
+        if Path('.').joinpath(OUT_FILENAME).exists():
+            Path('.').joinpath(OUT_FILENAME).unlink()
+            print("SDE: removing current sde database, because a change was detected")
+        res_path = Path('.').joinpath('sde').joinpath(data_resources[idx])
+        if res_path.exists():
+            shutil.rmtree(res_path)
+        if not MiscUtils.zip_decompress(Path('.').joinpath('data').joinpath(data_resources[idx] + ".zip"), Path('.').joinpath('sde').joinpath(data_resources[idx])):
+            print('SDE: Error decompressing ' + str(Path('.').joinpath('sde').joinpath(data_resources[idx])))
+
+if not Path('.').joinpath(OUT_FILENAME).exists():
+    processor = SdeParser(Path('.').joinpath('sde'), OUT_FILENAME)
+    processor.configuration.projection_algorithm = 'isometric' #values are isometric, dimetric and none
+    processor.configuration.projected_axis = 1 # value range 0-X, 1-Y, 2-Z
+    processor.configuration.extended_coordinates = False
+    processor.configuration.map_abbysal = True
+    processor.configuration.map_kspace = True
+    processor.configuration.map_void = True
+    processor.configuration.map_wspace = True
+    processor.configuration.projection_algorithm = 'isometric' # values are 'isometric' and 'dimetric'
+    processor.create_table_structure()
+    processor.parse_data()
+    processor.close()
+    eParser = ExternalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
+    eParser.map_url = MAPS_URL
+    eParser.configuration.with_icebelts = True
+    eParser.configuration.with_triglavian_status = True
+    eParser.configuration.with_jove_observatories = True
+    eParser.configuration.with_special_ore = True
+    eParser.process()

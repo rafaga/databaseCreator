@@ -37,8 +37,11 @@ class DatabaseDriver:
         if self.database_type == DatabaseType.SQLITE:
             if isinstance(data_source, Path):
                 self.__data_source = data_source
-            if isinstance(data_source, str):
+            elif isinstance(data_source, str):
                 self.__data_source = Path(data_source)
+            else:
+                self.__data_source = None
+                return
             if self.__data_source.exists() and self.__data_source.is_file():
                 if self.__is_sqlite3(self.__data_source):
                     self.__create_connection(self.__data_source)
@@ -81,5 +84,5 @@ class DatabaseDriver:
         return header[:16] == b'SQLite format 3\x00'
 
     def __create_connection(self, datasource_string):
-        if self.database_type == DatabaseType.SQLITE:
+        if self.database_type == DatabaseType.SQLITE and self.__data_source is not None:
             self.__connection = sqlite3.connect(self.__data_source.resolve())

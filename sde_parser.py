@@ -142,12 +142,12 @@ class SdeParser:
             if element.is_dir():
                 self._counter += 1
                 if self._counter == 0:
-                    self._parse_region(element.joinpath('region.staticdata'))
+                    self._parse_region(element.joinpath('region.yaml'))
                 if self._counter == 1:
-                    self._parse_constellation(element.joinpath('constellation.staticdata'))
+                    self._parse_constellation(element.joinpath('constellation.yaml'))
                 self._read_directory(element)
                 self._counter -= 1
-            if element.is_file() and element.name == "solarsystem.staticdata":
+            if element.is_file() and element.name == "solarsystem.yaml":
                 self._parse_solar_system(element)
 
     # Not used for now
@@ -391,11 +391,14 @@ class SdeParser:
         This method provides centralized point to parse all data
         and put it into tables
         """
+        if self._db_driver is None:
+            print("SDE: Error on database object Creation")
+            return
         self._parse_names()
-        self._parse_categories(Path(self._yaml_directory).joinpath('fsd', 'categoryIDs.yaml'))
-        self._parse_groups(Path(self._yaml_directory).joinpath('fsd', 'groupIDs.yaml'))
-        self._parse_types(Path(self._yaml_directory).joinpath('fsd', 'typeIDs.yaml'))
-        universe_dir = Path(self._yaml_directory).joinpath('fsd', 'universe')
+        self._parse_categories(Path(self._yaml_directory).joinpath('fsd', 'categories.yaml'))
+        self._parse_groups(Path(self._yaml_directory).joinpath('fsd', 'groups.yaml'))
+        self._parse_types(Path(self._yaml_directory).joinpath('fsd', 'types.yaml'))
+        universe_dir = Path(self._yaml_directory).joinpath('universe')
         if self._config.map_kspace:
             print('SDE: parsing High,Low and Nullsec Systems')
             self._read_directory(universe_dir.joinpath('eve'))
