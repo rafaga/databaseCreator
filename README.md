@@ -19,7 +19,8 @@ What data it is exported
 TODO:
 
   * support more databases engines
-  * support more customizing settings
+  * customizing settings
+  * rewrite it in Rust
 
 Dependencies:
 
