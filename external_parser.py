@@ -7,6 +7,7 @@ import xml.etree.ElementTree
 from pathlib import Path
 from urllib.parse import urlparse
 import csv
+import shutil
 from misc_utils import MiscUtils
 from database_driver import DatabaseDriver, DatabaseType
 
@@ -393,19 +394,19 @@ class ExternalParser():
         solar_system_ids.clear()
         # here we retrieving all the coordionates from the Regional maps
         tags = root.findall(".//{http://www.w3.org/2000/svg}use")
-        region_id = int(Path(map_filename).name.split('.')[0])
+        region_name = Path(map_filename).name.split('.')[0].replace('_', ' ')
         cur = self._db_driver.connection.cursor()
         for tag in tags:
             tag_id = tag.attrib.get('id')[3::]
-            solar_system_ids = {
+            solar_systems = {
                 "id": tag_id,
-                "regionId": region_id,
+                "regionName": region_name,
                 "X": tag.attrib.get('x'),
                 "Y": tag.attrib.get('y')
             }
             query = ('INSERT INTO mapAbstractSystems (solarSystemId,regionId,x,y)'
-                     ' VALUES (:id,:regionId,:X,:Y);')
-            cur.execute(query, solar_system_ids)
+                     ' VALUES (:id,(SELECT regionId FROM mapRegions WHERE regionName=:regionName),:X,:Y);')
+            cur.execute(query, solar_systems)
         cur.close()
         cur.connection.commit()
 
@@ -442,19 +443,20 @@ class ExternalParser():
 
     def process(self):
         """ Retrieving all Regions from Dotlan to parse the SVG data """
-        self._update_tables()
+        # self._update_tables()
         eve_regions = self.get_all_regions()
         for region in eve_regions:
             file_size = 0
-            map_filepath = Path(self.data_directory).joinpath(str(region[1]).replace(' ', '_') + '.svg')
+            map_filepath = Path(self.data_directory).joinpath('maps').joinpath(str(region[1]).replace(' ', '_') + '.svg')
             if not map_filepath.exists():
                 map_url = self.map_url + region[1].replace(' ', '_') + ".svg"
                 urlparse(map_url)
-                file_size = MiscUtils.download_file(map_url, "maps/" + str(region[1]).replace(' ', '_') + ".svg")
-                if file_size <= 100:
+                file_size = MiscUtils.download_file(map_url, str(region[1]).replace(' ', '_') + ".svg")
+                if file_size is None or file_size <= 100:
                     map_filepath.unlink()
                     print("Dotlan: Invalid data was recieved for " + region[1])
                 else:
+                    shutil.move( str(region[1]).replace(' ', '_') + ".svg",map_filepath)
                     print("Dotlan: Downloaded Map for " + region[1])
             print("Dotlan: parsing data for " + region[1])
             self._extract_map_data(map_filepath)

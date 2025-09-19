@@ -80,7 +80,6 @@ def update_as_needed(resource_name):
         print('SDE: ' + resource_name + ' its already updated')
     return False
     
-
 for idx in range(3):
     changes.append(update_as_needed(data_resources[idx]))
     if changes[idx]:
@@ -106,7 +105,7 @@ if not Path('.').joinpath(OUT_FILENAME).exists():
     processor.create_table_structure()
     processor.parse_data()
     processor.close()
-    eParser = ExternalParser(Path('.').joinpath('maps'), Path(OUT_FILENAME))
+    eParser = ExternalParser(Path('.').joinpath('sde'), Path(OUT_FILENAME))
     eParser.map_url = MAPS_URL
     eParser.configuration.with_icebelts = True
     eParser.configuration.with_triglavian_status = True
