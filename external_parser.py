@@ -385,7 +385,7 @@ class ExternalParser():
             tag_id = tag.attrib.get('id')
             if tag_id is not None:
                 solar_system_ids.append(tag_id[3::])
-        if len(solar_system_ids) > 0:
+        if len(solar_system_ids) > 0 and self.configuration.with_icebelts:
             query = "UPDATE mapSolarSystems SET iceBelt=1 WHERE solarSystemID IN (?)"
             cur = self._db_driver.connection.cursor()
             cur.executemany(query, self._iterate_list(solar_system_ids))
@@ -443,7 +443,7 @@ class ExternalParser():
 
     def process(self):
         """ Retrieving all Regions from Dotlan to parse the SVG data """
-        # self._update_tables()
+        self._update_tables()
         eve_regions = self.get_all_regions()
         for region in eve_regions:
             file_size = 0
