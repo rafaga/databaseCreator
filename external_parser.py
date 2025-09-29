@@ -373,10 +373,14 @@ class ExternalParser():
         map_file = Path(map_filename)
         if not map_file.exists():
             print("file not found ... skiping parsing")
-            return
+            return False
 
         e_tree = xml.etree.ElementTree.ElementTree()
-        root = e_tree.parse(source=map_filename)
+        try:
+            root = e_tree.parse(source=map_filename)
+        except xml.etree.ElementTree.ParseError as err:
+            print("Error on parsing " + map_filename + " - " + err.msg)
+            return False
         solar_system_ids = []
 
         # here we are iterating over Ice Belts and adding to Database
@@ -409,6 +413,7 @@ class ExternalParser():
             cur.execute(query, solar_systems)
         cur.close()
         cur.connection.commit()
+        return True
 
     def get_all_regions(self):
         """Function to get all regions from SDE and download the svg maps from dotlan"""
@@ -448,15 +453,23 @@ class ExternalParser():
         for region in eve_regions:
             file_size = 0
             map_filepath = Path(self.data_directory).joinpath('maps').joinpath(str(region[1]).replace(' ', '_') + '.svg')
-            if not map_filepath.exists():
-                map_url = self.map_url + region[1].replace(' ', '_') + ".svg"
-                urlparse(map_url)
-                file_size = MiscUtils.download_file(map_url, str(region[1]).replace(' ', '_') + ".svg")
-                if file_size is None or file_size <= 100:
+            for download_try in range(1,4):
+                if not map_filepath.exists():
+                    map_url = self.map_url + region[1].replace(' ', '_') + ".svg"
+                    urlparse(map_url)
+                    file_size = MiscUtils.download_file(map_url, str(region[1]).replace(' ', '_') + ".svg")
+                    if file_size is None or file_size <= 100:
+                        map_filepath.unlink()
+                        print("Dotlan: Invalid data was recieved for " + region[1])
+                    else:
+                        if not Path(self.data_directory).joinpath('maps').exists():
+                            Path(self.data_directory).joinpath('maps').mkdir()
+                        shutil.move( str(region[1]).replace(' ', '_') + ".svg",map_filepath)
+                        print("Dotlan: Downloaded Map for " + region[1])
+                print("Dotlan: parsing data for " + region[1])
+                if not self._extract_map_data(map_filepath):
+                    download_try += 1
                     map_filepath.unlink()
-                    print("Dotlan: Invalid data was recieved for " + region[1])
+                    print("Dotlan: Invalid data for " + region[1] + ", retrying download (" + download_try + ").")
                 else:
-                    shutil.move( str(region[1]).replace(' ', '_') + ".svg",map_filepath)
-                    print("Dotlan: Downloaded Map for " + region[1])
-            print("Dotlan: parsing data for " + region[1])
-            self._extract_map_data(map_filepath)
+                    break

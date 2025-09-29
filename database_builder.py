@@ -55,6 +55,8 @@ def update_as_needed(resource_name):
     downloaded_data = download_control(md5_url)
 
     if downloaded_data is not None:
+        if not Path(".").joinpath("data").exists():
+            Path(".").joinpath("data").mkdir()
         shutil.move(Path('.').joinpath(files[0]),md5_file)
         with open(md5_file, 'rt', encoding="UTF-8") as file:
             md5.append(file.read())
