@@ -610,11 +610,11 @@ class SdeParser:
 
     def parse_connections(self):
         cur = self._db_driver.connection.cursor()
-        query = ('INSERT INTO mapSystemConnections (systemConnectionId, systemA, systemB) '
-                  'SELECT LOWER(HEX(RANDOMBLOB(4))), msga.solarSystemId, msgb.solarSystemId '
+        query = ('INSERT INTO mapSystemConnections (systemA, systemB) '
+                  'SELECT MIN(msga.solarSystemId, msgb.solarSystemId), MAX(msga.solarSystemId, msgb.solarSystemId) '
                   'FROM mapSystemGates AS msga '
-                  'INNER JOIN mapSystemGates AS msgb ON (msgb.systemGateId = msga.destinationGateId) '
-                  'WHERE msga.solarSystemId > msgb.solarSystemId')
+                  'INNER JOIN mapSystemGates AS msgb ON (msgb.systemGateId = msga.destinationGateId)'
+                  'WHERE msga.solarSystemId < msgb.solarSystemId ')
         cur.execute(query)
         cur.close()
 

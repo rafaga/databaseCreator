@@ -193,11 +193,12 @@ CREATE INDEX idx_mapSystemGates_typeId ON mapSystemGates(typeId);
 -- FIX: CHAR(8) no es válido en STRICT -> TEXT + CHECK de longitud
 -- para conservar la intención original.
 CREATE TABLE mapSystemConnections (
-  systemConnectionId TEXT PRIMARY KEY CHECK (length(systemConnectionId) = 8),
   systemA INTEGER NOT NULL REFERENCES mapSolarSystems(solarSystemId)
             ON UPDATE CASCADE ON DELETE RESTRICT,
   systemB INTEGER NOT NULL REFERENCES mapSolarSystems(solarSystemId)
-            ON UPDATE CASCADE ON DELETE RESTRICT
+            ON UPDATE CASCADE ON DELETE RESTRICT,
+  PRIMARY KEY (systemA, systemB),
+  CHECK (systemA < systemB)
 ) STRICT;
 CREATE INDEX idx_mapSystemConnections_systemA ON mapSystemConnections(systemA);
 CREATE INDEX idx_mapSystemConnections_systemB ON mapSystemConnections(systemB);

@@ -115,19 +115,29 @@ def update_as_needed(variant="jsonl"):
 # --- Verifica y descarga si hay una versión nueva ---
 change = update_as_needed(SDE_VARIANT)
 
-# --- Si hubo cambio, reconstruye la base local ---
-if change:
-    if Path('.').joinpath(OUT_FILENAME).exists():
-        Path('.').joinpath(OUT_FILENAME).unlink()
-        print("SDE: removing current sde database, because a change was detected")
+# --- Se reconstruye la base local ---
+if Path('.').joinpath(OUT_FILENAME).exists():
+    Path('.').joinpath(OUT_FILENAME).unlink()
+    print("SDE: removing current sde database, because a change was detected")
 
-    sde_path = Path('.').joinpath('sde')
-    if sde_path.exists():
-        shutil.rmtree(sde_path)
+sde_path = Path('.').joinpath('sde')
+maps_path = sde_path.joinpath('maps')
 
-    zip_path = Path('.').joinpath('data').joinpath(f"sde-{SDE_VARIANT}.zip")
-    if not MiscUtils.zip_decompress(zip_path, sde_path):
-        print('SDE: Error decompressing ' + str(sde_path))
+if sde_path.exists():
+    # No se borra la carpeta completa: 'maps' contiene los SVG de dotlan,
+    # que vienen de otra fuente y no deben re-descargarse en cada build.
+    for item in sde_path.iterdir():
+        if item.resolve() == maps_path.resolve():
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+    print("SDE: removing current sde contents (except maps/), because a change was detected")
+
+zip_path = Path('.').joinpath('data').joinpath(f"sde-{SDE_VARIANT}.zip")
+if not MiscUtils.zip_decompress(zip_path, sde_path):
+    print('SDE: Error decompressing ' + str(sde_path))
 
 if not Path('.').joinpath(OUT_FILENAME).exists():
     processor = SdeParser(Path('.').joinpath('sde'), OUT_FILENAME)

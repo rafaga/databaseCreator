@@ -7,6 +7,7 @@ import xml.etree.ElementTree
 from pathlib import Path
 from urllib.parse import urlparse
 import csv
+import json
 import shutil
 from misc_utils import MiscUtils
 from database_driver import DatabaseDriver, DatabaseType
@@ -415,6 +416,48 @@ class ExternalParser():
         cur.connection.commit()
         return True
 
+    def _manifest_path(self):
+        """Ruta del manifiesto que guarda el fingerprint remoto de cada mapa"""
+        return Path(self.data_directory).joinpath('maps').joinpath('_manifest.json')
+
+    def _load_manifest(self):
+        """Carga el manifiesto de mapas de dotlan ya descargados"""
+        manifest_file = self._manifest_path()
+        if manifest_file.exists():
+            try:
+                with open(manifest_file, 'rt', encoding='UTF-8') as file:
+                    return json.load(file)
+            except (json.JSONDecodeError, OSError):
+                print("Dotlan: manifiesto ilegible, se reconstruirá desde cero")
+        return {}
+
+    def _save_manifest(self, manifest):
+        """Guarda el manifiesto de mapas de dotlan"""
+        manifest_file = self._manifest_path()
+        manifest_file.parent.mkdir(exist_ok=True)
+        with open(manifest_file, 'wt', encoding='UTF-8') as file:
+            json.dump(manifest, file, indent=2)
+
+    def _remote_map_fingerprint(self, map_url):
+        """
+        Hace un HEAD request al mapa de dotlan y regresa su fingerprint
+        (ETag / Last-Modified / Content-Length) sin descargar el archivo
+        completo. Regresa None si no se pudo verificar (p. ej. sin red o
+        respuesta distinta a 200), en cuyo caso se asume que no hay forma
+        de saber si cambió.
+        """
+        response = MiscUtils.head(map_url)
+        if response is None:
+            return None
+        if response.status_code != 200:
+            print(f"Dotlan: HEAD {map_url} devolvió {response.status_code}")
+            return None
+        return {
+            'etag': response.headers.get('ETag'),
+            'last_modified': response.headers.get('Last-Modified'),
+            'content_length': response.headers.get('Content-Length'),
+        }
+
     def get_all_regions(self):
         """Function to get all regions from SDE and download the svg maps from dotlan"""
         cur = self._db_driver.connection.cursor()
@@ -450,26 +493,53 @@ class ExternalParser():
         """ Retrieving all Regions from Dotlan to parse the SVG data """
         self._update_tables()
         eve_regions = self.get_all_regions()
+        manifest = self._load_manifest()
+        manifest_changed = False
+
         for region in eve_regions:
-            file_size = 0
-            map_filepath = Path(self.data_directory).joinpath('maps').joinpath(str(region[1]).replace(' ', '_') + '.svg')
-            for download_try in range(1,4):
-                if not map_filepath.exists():
-                    map_url = self.map_url + region[1].replace(' ', '_') + ".svg"
+            region_name = region[1]
+            region_filename = str(region_name).replace(' ', '_') + ".svg"
+            map_filepath = Path(self.data_directory).joinpath('maps').joinpath(region_filename)
+            map_url = self.map_url + region_name.replace(' ', '_') + ".svg"
+
+            # Se compara el fingerprint remoto (ETag/Last-Modified) contra el
+            # guardado en el manifiesto para saber si el mapa cambió en dotlan,
+            # sin tener que descargar el SVG completo solo para comparar.
+            fingerprint = self._remote_map_fingerprint(map_url)
+            cached_fingerprint = manifest.get(region_name)
+
+            needs_download = not map_filepath.exists()
+            if fingerprint is not None and fingerprint != cached_fingerprint:
+                needs_download = True
+
+            for download_try in range(1, 4):
+                if needs_download:
                     urlparse(map_url)
-                    file_size = MiscUtils.download_file(map_url, str(region[1]).replace(' ', '_') + ".svg")
+                    file_size = MiscUtils.download_file(map_url, region_filename)
                     if file_size is None or file_size <= 100:
-                        map_filepath.unlink()
-                        print("Dotlan: Invalid data was recieved for " + region[1])
+                        if map_filepath.exists():
+                            map_filepath.unlink()
+                        print("Dotlan: Invalid data was recieved for " + region_name)
                     else:
                         if not Path(self.data_directory).joinpath('maps').exists():
                             Path(self.data_directory).joinpath('maps').mkdir()
-                        shutil.move( str(region[1]).replace(' ', '_') + ".svg",map_filepath)
-                        print("Dotlan: Downloaded Map for " + region[1])
-                print("Dotlan: parsing data for " + region[1])
+                        shutil.move(region_filename, map_filepath)
+                        print("Dotlan: Downloaded Map for " + region_name)
+                        if fingerprint is not None:
+                            manifest[region_name] = fingerprint
+                            manifest_changed = True
+                else:
+                    print("Dotlan: " + region_name + " not changed, skipping download.")
+
+                print("Dotlan: parsing data for " + region_name)
                 if not self._extract_map_data(map_filepath):
                     download_try += 1
-                    map_filepath.unlink()
-                    print("Dotlan: Invalid data for " + region[1] + ", retrying download (" + download_try + ").")
+                    needs_download = True
+                    if map_filepath.exists():
+                        map_filepath.unlink()
+                    print("Dotlan: Invalid data for " + region_name + ", retrying download (" + str(download_try) + ").")
                 else:
                     break
+
+        if manifest_changed:
+            self._save_manifest(manifest)

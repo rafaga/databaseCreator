@@ -25,6 +25,20 @@ class MiscUtils(object):
         cls.__chunk_size = size
 
     @classmethod
+    def head(cls, url, timeout=15):
+        """
+        Realiza un HEAD request y regresa el objeto Response de requests,
+        o None si no fue posible completarlo (timeout, error de conexión,
+        DNS, etc). Centraliza el manejo de errores de red para que otros
+        módulos (p. ej. external_parser.py) no dupliquen esta lógica.
+        """
+        try:
+            return requests.head(url, allow_redirects=True, timeout=timeout)
+        except requests.RequestException as err:
+            print(f'Misc: HEAD request failed for {url} ({err})')
+            return None
+
+    @classmethod
     # TODO: Convertir este metodo en algo mas adecuado para uso de clases
     def download_file(cls, url, filename=None):
         """
@@ -40,8 +54,8 @@ class MiscUtils(object):
             # TODO: implement a way to discard any no-esscential parameter from url
             file_path = url.split('/')[-1]
         # check if URL exists
-        r = requests.head(url, allow_redirects=True, timeout=500)
-        if r.status_code == 200:
+        r = cls.head(url, timeout=500)
+        if r is not None and r.status_code == 200:
             request_obj = requests.get(url, stream=True, timeout=500)
             with open(file_path, "wb") as zip_file:
                 total_length = 0
@@ -69,7 +83,7 @@ class MiscUtils(object):
         zip_file = None
         unzip_file = None
         bz_decomp = bz2.BZ2Decompressor()
-        filesize = Path(compressed_filepath).stat['st_size']
+        filesize = Path(compressed_filepath).stat().st_size
         decompressed_total = 0
         with open(compressed_filepath, 'rb') as zip_file:
             unzip_file = open(uncompressed_filepath, "wb")
