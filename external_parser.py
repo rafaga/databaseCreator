@@ -162,7 +162,7 @@ class ExternalParser():
 
         print("External: Creating Icebelt table")
         query = ('ALTER TABLE mapSolarSystems ADD COLUMN iceBelt'
-                    ' BOOL NOT NULL DEFAULT 0;')
+                    ' INTEGER NOT NULL DEFAULT 0 CHECK (iceBelt IN (0,1));')
         cur.execute(query)
 
         query = 'CREATE INDEX icebelts ON mapSolarSystems (solarSystemId, iceBelt);'
@@ -181,7 +181,7 @@ class ExternalParser():
         print("SMT: Adding Jove Systems")
 
         query = ('ALTER TABLE mapSolarSystems ADD COLUMN joveObservatory'
-                ' BOOL NOT NULL DEFAULT 0;')
+                ' INTEGER NOT NULL DEFAULT 0 CHECK (joveObservatory IN (0,1));')
         cur.execute(query)
 
         query = 'CREATE INDEX joveSystems ON mapSolarSystems (solarSystemId, joveObservatory);'
@@ -435,7 +435,7 @@ class ExternalParser():
         cur = self._db_driver.connection.cursor()
 
         query = ('ALTER TABLE mapSolarSystems ADD COLUMN specialOreAnom'
-                ' BOOL NOT NULL DEFAULT 0;')
+                ' INTEGER NOT NULL DEFAULT 0 CHECK (specialOreAnom IN (0,1));')
         cur.execute(query)
 
         query = ('UPDATE mapSolarSystems AS ms SET specialOreAnom=1 FROM '

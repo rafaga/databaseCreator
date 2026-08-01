@@ -9,9 +9,13 @@ import shutil
 from sde_parser import SdeParser
 from misc_utils import MiscUtils
 from external_parser import ExternalParser
+import json
+import shutil
+from pathlib import Path
 
 FUZZ_DB_URL = 'https://www.fuzzwork.co.uk/dump/'
-SDE_URL = 'https://eve-static-data-export.s3-eu-west-1.amazonaws.com/tranquility/'
+SDE_URL = "https://developers.eveonline.com/static-data/tranquility/" #eve-online-static-data-latest-yaml.zip
+SDE_LATEST_INDEX_URL = SDE_URL + "latest.jsonl"
 MAPS_URL = 'http://evemaps.dotlan.net/svg/'
 FUZZ_DB_NAME = 'sqlite-latest.sqlite.bz2'
 SDE_FILENAME = 'sde.zip'
@@ -20,6 +24,7 @@ OUT_FILENAME = 'sde.db'
 MD5_CHECKSUM = ''
 data_resources = ['fsd','bsd','universe']
 MiscUtils.chunk_size = 2391975
+SDE_VARIANT = "jsonl"  # o "yaml", según el formato que consuma tu app
 
 changes = []
 
@@ -41,65 +46,95 @@ def download_control(file_name, retries=3):
         print('Maximum retries exceeded, aborting...')
     return bytes_downloaded
 
-def update_as_needed(resource_name):
-    md5 = []
-    files = [resource_name + ".zip.checksum",resource_name + ".zip.checksum.bak", resource_name + ".zip"]
-    md5_file = Path('.').joinpath('data').joinpath(files[0])
-    bak_file = Path('.').joinpath('data').joinpath(files[1])
-    zip_file = Path('.').joinpath('data').joinpath(files[2])
-    md5_url = SDE_URL + files[0]
-    zip_url = SDE_URL + files[2]
+def update_as_needed(variant="jsonl"):
+    """
+    Verifica el build number más reciente del SDE publicado por CCP
+    (developers.eveonline.com) y descarga el zip correspondiente solo
+    si hay una versión más nueva que la que tenemos guardada localmente.
 
-    if md5_file.exists():
-        md5_file.unlink()
-    downloaded_data = download_control(md5_url)
+    variant: "jsonl" o "yaml" -- formato de exportación deseado.
 
-    if downloaded_data is not None:
-        if not Path(".").joinpath("data").exists():
-            Path(".").joinpath("data").mkdir()
-        shutil.move(Path('.').joinpath(files[0]),md5_file)
-        with open(md5_file, 'rt', encoding="UTF-8") as file:
-            md5.append(file.read())
-    else:
-        print('SDE: ' + md5_url + ' data not found')
-        md5.append('')
-    if bak_file.exists():
-        with open(bak_file, 'rt', encoding="UTF-8") as file:
-            md5.append(file.read())
-    else:
-        md5.append('')
+    Ref: https://developers.eveonline.com/docs/services/static-data/#schema-changes
+    """
+    data_dir = Path('.').joinpath('data')
+    data_dir.mkdir(exist_ok=True)
 
-    if md5[0] != md5[1] and len(md5[1]) > 0 or not zip_file.exists():
-        print('SDE: Inconsistencies found for ' + resource_name + ' data')
-        if zip_file.exists():
-            zip_file.unlink()
-        print('SDE: Downloading ' + resource_name + ' data ')
-        if download_control(zip_url) is not None:
-            shutil.move(Path('.').joinpath(files[2]),zip_file)
-        shutil.copyfile(md5_file,bak_file)
+    build_file = data_dir.joinpath(f"sde-{variant}.build")
+    zip_file = data_dir.joinpath(f"sde-{variant}.zip")
+
+    # 1. Descargar el índice con el build number más reciente
+    downloaded_index = download_control(SDE_LATEST_INDEX_URL)
+    if downloaded_index is None:
+        print('SDE: ' + SDE_LATEST_INDEX_URL + ' data not found')
+        return False
+
+    index_tmp = Path('.').joinpath('latest.jsonl')
+    latest_build = None
+    try:
+        with open(index_tmp, 'rt', encoding='UTF-8') as file:
+            for line in file:
+                line = line.strip()
+                if not line:
+                    continue
+                record = json.loads(line)
+                if record.get('_key') == 'sde':
+                    latest_build = record.get('buildNumber')
+                    break
+    finally:
+        if index_tmp.exists():
+            index_tmp.unlink()
+
+    if latest_build is None:
+        print('SDE: could not determine latest build number')
+        return False
+
+    # 2. Comparar contra el build guardado localmente
+    current_build = None
+    if build_file.exists():
+        current_build = build_file.read_text(encoding='UTF-8').strip()
+
+    if str(current_build) == str(latest_build) and zip_file.exists():
+        print(f'SDE: {variant} data its already updated (build {latest_build})')
+        return False
+
+    print(f'SDE: New build available ({current_build} -> {latest_build}), downloading {variant} data')
+
+    zip_url = SDE_URL + f"eve-online-static-data-{latest_build}-{variant}.zip"
+    if zip_file.exists():
+        zip_file.unlink()
+
+    if download_control(zip_url) is not None:
+        downloaded_name = Path('.').joinpath(f"eve-online-static-data-{latest_build}-{variant}.zip")
+        shutil.move(downloaded_name, zip_file)
+        build_file.write_text(str(latest_build), encoding='UTF-8')
         return True
     else:
-        print('SDE: ' + resource_name + ' its already updated')
-    return False
-    
-for idx in range(3):
-    changes.append(update_as_needed(data_resources[idx]))
-    if changes[idx]:
-        if Path('.').joinpath(OUT_FILENAME).exists():
-            Path('.').joinpath(OUT_FILENAME).unlink()
-            print("SDE: removing current sde database, because a change was detected")
-        res_path = Path('.').joinpath('sde').joinpath(data_resources[idx])
-        if res_path.exists():
-            shutil.rmtree(res_path)
-        if not MiscUtils.zip_decompress(Path('.').joinpath('data').joinpath(data_resources[idx] + ".zip"), Path('.').joinpath('sde').joinpath(data_resources[idx])):
-            print('SDE: Error decompressing ' + str(Path('.').joinpath('sde').joinpath(data_resources[idx])))
+        print('SDE: ' + zip_url + ' data not found')
+        return False
+
+# --- Verifica y descarga si hay una versión nueva ---
+change = update_as_needed(SDE_VARIANT)
+
+# --- Si hubo cambio, reconstruye la base local ---
+if change:
+    if Path('.').joinpath(OUT_FILENAME).exists():
+        Path('.').joinpath(OUT_FILENAME).unlink()
+        print("SDE: removing current sde database, because a change was detected")
+
+    sde_path = Path('.').joinpath('sde')
+    if sde_path.exists():
+        shutil.rmtree(sde_path)
+
+    zip_path = Path('.').joinpath('data').joinpath(f"sde-{SDE_VARIANT}.zip")
+    if not MiscUtils.zip_decompress(zip_path, sde_path):
+        print('SDE: Error decompressing ' + str(sde_path))
 
 if not Path('.').joinpath(OUT_FILENAME).exists():
     processor = SdeParser(Path('.').joinpath('sde'), OUT_FILENAME)
     processor.configuration.projection_algorithm = 'isometric' #values are isometric, dimetric and none
     processor.configuration.projected_axis = 1 # value range 0-X, 1-Y, 2-Z
-    processor.configuration.extended_coordinates = False
-    processor.configuration.map_abbysal = True
+    processor.configuration.file_format = SDE_VARIANT  # antes no se enlazaba con el parser
+    processor.configuration.map_abyssal = True
     processor.configuration.map_kspace = True
     processor.configuration.map_void = True
     processor.configuration.map_wspace = True

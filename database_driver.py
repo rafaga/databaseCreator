@@ -18,6 +18,11 @@ class DatabaseType(enum.Enum):
     SQLITE = 1
 
 
+class InvalidDatabaseFileError(Exception):
+    """Raised when data_source points to an existing file that isn't a
+    valid SQLite database (e.g. corrupted or zero-byte file)."""
+
+
 class DatabaseDriver:
     """Module that works as a simple abstraction layer for database operations"""
     # Internal Variables
@@ -45,6 +50,11 @@ class DatabaseDriver:
             if self.__data_source.exists() and self.__data_source.is_file():
                 if self.__is_sqlite3(self.__data_source):
                     self.__create_connection(self.__data_source)
+                else:
+                    raise InvalidDatabaseFileError(
+                        f"'{self.__data_source}' exists but isn't a valid SQLite "
+                        "database file (bad or missing header). Remove or rename "
+                        "it before pointing data_source at it.")
             else:
                 self.__create_connection(self.__data_source)
         if data_source is None:
