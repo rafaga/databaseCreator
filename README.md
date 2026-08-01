@@ -2,6 +2,8 @@
 
 Utility to dump SDE data into a ralational database
 
+NOTE: this repository is no loger mantained, and its preserved for historic propourses only. This code will be ported to rust as part of a bigger codebase in the crate sde
+
 Supported Databases:
 
   * SQLite
